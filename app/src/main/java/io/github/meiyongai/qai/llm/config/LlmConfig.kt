@@ -234,18 +234,24 @@ object LlmConfig {
             """
             $basePrompt
 
-            【回复要求】
-            你必须直接以设定的角色身份在聊天中发言，绝不要给用户提建议或进行情境分析！
-            严禁输出任何“针对该情境”、“可以参考以下回复”、“回复角度”等前言、导语或总结说明。
-            严禁输出“**角度**”等分类标签，严禁使用数字序号列表。
-            请直接生成 3~4 条不同语气或切入点的纯回复文本供用户挑选，每条回复必须严格使用 <<<OPTION>>> 单独一行作为前缀分隔。
-            格式示例：
+            【回复模式：多项候选】
+            你现在正在聊天中亲自回复消息。请严格按照当前角色人设，直接输出多条真实聊天回复供用户选择。
+            绝对禁止以助手身份进行局外分析，严禁输出任何“针对该情境”、“可以参考以下回复”、“回复角度”等前言、导语或总结说明。
+            严禁输出任何分类标签、粗体标题或数字序号。
+            每条回复必须且仅以 <<<OPTION>>> 单独一行开头。
+
+            正例（必须严格遵循此结构）：
             <<<OPTION>>>
-            第一条直接要说的话
+            直接回复内容一
             <<<OPTION>>>
-            第二条直接要说的话
+            直接回复内容二
             <<<OPTION>>>
-            第三条直接要说的话
+            直接回复内容三
+
+            反例（绝对严禁输出此类内容）：
+            可以参考以下几种回复角度：
+            1. **角度一**
+            “回复内容”
             """.trimIndent()
         } else {
             basePrompt
@@ -530,61 +536,15 @@ object LlmConfig {
     }
 
     /**
-     * 清洗单个候选回复项的文本内容。
-     *
-     * 剥离大模型附带的分类标签（如 "**调侃 AI 状态**" 或 "方案一："）
-     * 以及外层包裹的冗余引号，提炼适合直接发送至聊天中的真实回复文本。
-     *
-     * Args:
-     *     rawItem (String): 候选原始切片字符串。
-     *
-     * Returns:
-     *     String: 清洗后的纯净回复文本。
-     *
-     * Callers:
-     *     - `LlmConfig.kt:LlmConfig.parseCandidates`
-     */
-    fun cleanCandidateItem(rawItem: String): String {
-        var text = rawItem.trim()
-        if (text.isEmpty()) return ""
-
-        // 若前序包含粗体标签行或分类行（如 "**调侃 AI 状态**" 或 "调侃状态："），且后续紧跟换行
-        val tagRegex = Regex("""^(?:\*\*[^\*\n]+\*\*|[^\n]{1,15}[:：])\s*\n+""")
-        if (tagRegex.containsMatchIn(text)) {
-            val afterTag = text.replaceFirst(tagRegex, "").trim()
-            if (afterTag.isNotEmpty()) {
-                text = afterTag
-            }
-        }
-
-        // 若整段被中文双引号、直角单双引号或英文双引号完整包裹（如 “xxxx” 或 "xxxx"），剥除外层引号
-        if ((text.startsWith("“") && text.endsWith("”")) ||
-            (text.startsWith("\"") && text.endsWith("\"")) ||
-            (text.startsWith("「") && text.endsWith("」")) ||
-            (text.startsWith("『") && text.endsWith("』"))
-        ) {
-            val unquoted = text.substring(1, text.length - 1).trim()
-            if (unquoted.isNotEmpty()) {
-                text = unquoted
-            }
-        }
-
-        return text
-    }
-
-    /**
      * 解析大模型输出的文本并拆分为多条候选回复列表。
      *
-     * 具备分层自适应解析与容错能力：
-     * 1. 优先使用标准 <<<OPTION>>> 标记进行结构化切分；
-     * 2. 若大模型输出常见的序号列表（如 1. / 2.、选项1 / 选项2 等），自动识别候选边界、剥离顶部导语前言并提取各条独立回复；
-     * 3. 自动对每条候选内容进行净化，去除多余的分类加粗标签及包裹引号，确保直接提取出可发送的消息文本。
+     * 使用 <<<OPTION>>> 分隔符拆分候选内容并去除首尾空白字符。
      *
      * Args:
      *     raw (String): 大模型返回的原始累积响应文本。
      *
      * Returns:
-     *     List<String>: 提取并净化后的候选回复列表；若无明确多项结构则返回非空原文。
+     *     List<String>: 提取出的候选回复列表；若无分隔符则将非空原文作为单项列表返回。
      *
      * Callers:
      *     - `AiReplyBottomSheetDialog.kt:AiReplyBottomSheetDialog.onChunk`
@@ -594,37 +554,10 @@ object LlmConfig {
     fun parseCandidates(raw: String): List<String> {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return emptyList()
-
-        // 1. 优先匹配标准 <<<OPTION>>> 分隔符
-        val optionRegex = Regex("<<<OPTION(?:\\s*\\d+)?>>>", RegexOption.IGNORE_CASE)
-        if (optionRegex.containsMatchIn(trimmed)) {
-            val parts = trimmed.split(optionRegex)
-                .map { cleanCandidateItem(it) }
-                .filter { it.isNotEmpty() }
-            if (parts.isNotEmpty()) return parts
-        }
-
-        // 2. 自适应解析：匹配常见序号或选项标记（如 "1. "、"1、"、"(1)"、"【选项1】"、"选项一：" 等）
-        val itemPattern = Regex("""(?m)^(?:\s*(?:[1-9]\d?[\.、\)]|（[1-9]\d?）|\([1-9]\d?\)|【?(?:选项|候选|方案|回复)\s*[1-9一二三四五六七八九十]】?[:：]?)\s*)""")
-        val matches = itemPattern.findAll(trimmed).toList()
-        if (matches.size >= 2) {
-            val candidates = mutableListOf<String>()
-            for (i in matches.indices) {
-                val start = matches[i].range.last + 1
-                val end = if (i + 1 < matches.size) matches[i + 1].range.first else trimmed.length
-                if (start < end) {
-                    val content = cleanCandidateItem(trimmed.substring(start, end))
-                    if (content.isNotEmpty()) {
-                        candidates.add(content)
-                    }
-                }
-            }
-            if (candidates.size >= 2) {
-                return candidates
-            }
-        }
-
-        // 3. 兜底回退为单项原文（同样去除多余包裹）
-        return listOf(cleanCandidateItem(trimmed))
+        val delimiterRegex = Regex("<<<OPTION(?:\\s*\\d+)?>>>", RegexOption.IGNORE_CASE)
+        val parts = trimmed.split(delimiterRegex)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        return if (parts.isNotEmpty()) parts else listOf(trimmed)
     }
 }

@@ -1006,7 +1006,7 @@ class AiReplyBottomSheetDialog(
 
         val isMultiChoice = LlmConfig.isMultiChoiceEnabled(activity)
         val effectiveUserPrompt = if (isMultiChoice) {
-            "$originPrompt\n\n【输出指示】请直接扮演设定角色输出 3~4 条不同的回复备选（严禁任何前言分析或分类说明，每条备选必须严格且仅以 <<<OPTION>>> 单独一行作为前缀分隔）。"
+            "$originPrompt\n\n【行动指令】请针对上述目标消息直接回复。严格按照角色设定给出多条纯台词回复，每条前面单独一行写 <<<OPTION>>>。严禁任何情境分析或前言！"
         } else {
             originPrompt
         }
