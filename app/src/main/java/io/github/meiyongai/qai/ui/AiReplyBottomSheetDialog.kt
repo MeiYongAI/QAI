@@ -1004,13 +1004,20 @@ class AiReplyBottomSheetDialog(
             return
         }
 
+        val isMultiChoice = LlmConfig.isMultiChoiceEnabled(activity)
+        val effectiveUserPrompt = if (isMultiChoice) {
+            "$originPrompt\n\n【输出指示】请直接扮演设定角色输出 3~4 条不同的回复备选（严禁任何前言分析或分类说明，每条备选必须严格且仅以 <<<OPTION>>> 单独一行作为前缀分隔）。"
+        } else {
+            originPrompt
+        }
+
         streamClient = StreamChatClient().apply {
             startStream(
                 baseUrl = baseUrl,
                 apiKey = apiKey,
                 model = model,
                 systemPrompt = systemPrompt,
-                userPrompt = originPrompt,
+                userPrompt = effectiveUserPrompt,
                 imagePaths = imagePaths,
                 temperature = temperature,
                 reasoningEffort = reasoningEffort,
