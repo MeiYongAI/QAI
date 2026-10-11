@@ -511,6 +511,7 @@ class AiReplyBottomSheetDialog(
         reasoningSpentSeconds = 0L
         reasoningStartTime = 0L
         selectedCandidateIndex = 0
+        scrollView.post { scrollView.scrollTo(0, 0) }
 
         val isMultiChoice = LlmConfig.isMultiChoiceEnabled(activity)
         val isNight = isNightMode()
@@ -1066,8 +1067,8 @@ class AiReplyBottomSheetDialog(
                                 }
                             } else {
                                 tvContent.text = fullResponse.toString()
+                                scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
                             }
-                            scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
                         }
                     }
 
@@ -1079,6 +1080,10 @@ class AiReplyBottomSheetDialog(
                             if (reasoningEffort > LlmConfig.REASONING_OFF && reasoningBuilder.isNotEmpty() && reasoningSpentSeconds == 0L) {
                                 reasoningSpentSeconds = Math.max(1, (System.currentTimeMillis() - reasoningStartTime) / 1000)
                                 tvReasoningTitle.text = "已深度思考 (${reasoningSpentSeconds}秒)"
+                            }
+                            val isMultiChoice = LlmConfig.isMultiChoiceEnabled(activity)
+                            if (isMultiChoice) {
+                                scrollView.post { scrollView.scrollTo(0, 0) }
                             }
                         }
                     }
