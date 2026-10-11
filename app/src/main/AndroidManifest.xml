@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:description="@string/app_desc"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.QQAi">
+
+        <!-- LibXposed 102 模块标识 -->
+        <meta-data
+            android:name="xposedmodule"
+            android:value="true" />
+
+        <!-- 模块配置 Activity (无桌面图标) -->
+        <activity
+            android:name=".ui.AiSettingsActivity"
+            android:exported="true"
+            android:label="@string/app_name" />
+    </application>
+
+</manifest>

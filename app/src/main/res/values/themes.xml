@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.QQAi" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/qq_blue</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <style name="Animation.BottomSheet" parent="android:Animation">
+        <item name="android:windowEnterAnimation">@anim/slide_in_bottom</item>
+        <item name="android:windowExitAnimation">@anim/slide_out_bottom</item>
+    </style>
+</resources>

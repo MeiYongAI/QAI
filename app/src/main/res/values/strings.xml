@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">QAI</string>
+    <string name="app_desc">QAI: QQ 聊天 AI 助手模块</string>
+    <string name="settings_title">QAI 设置</string>
+
+    <string name="pref_provider_title">服务商预设</string>
+    <string name="pref_base_url_title">API Base URL</string>
+    <string name="pref_api_key_title">API Key (多Key可用英文逗号分隔)</string>
+    <string name="pref_model_title">模型名称</string>
+    <string name="pref_system_prompt_title">System Prompt (角色人设)</string>
+    <string name="pref_temperature_title">采样温度 (Temperature)</string>
+    <string name="pref_max_tokens_title">最大生成长度 (Max Tokens)</string>
+
+    <string name="btn_fetch_models">获取在线模型列表</string>
+    <string name="btn_test_connection">测试 API 连通性</string>
+    <string name="btn_save_config">保存配置</string>
+
+    <string name="toast_saved">配置已保存</string>
+</resources>

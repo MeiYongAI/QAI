@@ -1,0 +1,13 @@
+<resources>
+    <string-array name="xposed_scope">
+        <item>com.tencent.mobileqq</item>
+    </string-array>
+
+    <string-array name="provider_names">
+        <item>Gemini</item>
+        <item>OpenAI</item>
+        <item>OpenRouter</item>
+        <item>DeepSeek</item>
+        <item>自定义接口</item>
+    </string-array>
+</resources>

@@ -1,0 +1,887 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F6F8">
+
+    <!-- 内容滚动区域：穿透沉浸式半透明顶栏，去除系统丑陋的侧边自隐藏拖动条 -->
+    <ScrollView
+        android:id="@+id/scrollView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:overScrollMode="never"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:id="@+id/contentLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="40dp">
+
+            <!-- 分组 1：服务 -->
+            <TextView
+                android:id="@+id/tvGroup1Title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="7dp"
+                android:text="服务"
+                android:textColor="#8E8E93"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/cardProvider"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:background="@drawable/bg_qq_card"
+                android:clipToOutline="true"
+                android:orientation="vertical">
+
+                <!-- 1. 服务商 -->
+                <RelativeLayout
+                    android:id="@+id/itemProvider"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvProviderLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="服务商"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvProviderValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="DeepSeek"
+                            android:textColor="#8E8E93"
+                            android:textSize="14sp" />
+
+                        <ImageView
+                            android:id="@+id/ivProviderArrow"
+                            android:layout_width="8dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="6dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/qui_chevron_right" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/div1"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 2. 接口地址 -->
+                <RelativeLayout
+                    android:id="@+id/itemBaseUrl"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvBaseUrlLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="接口地址"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvBaseUrlValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:maxWidth="160dp"
+                            android:singleLine="true"
+                            android:text="https://api.deepseek.com"
+                            android:textColor="#8E8E93"
+                            android:textSize="13sp" />
+
+                        <ImageView
+                            android:id="@+id/ivBaseUrlArrow"
+                            android:layout_width="8dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="6dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/qui_chevron_right" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/div2"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 3. API 密钥 -->
+                <RelativeLayout
+                    android:id="@+id/itemApiKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvApiKeyLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="API 密钥"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvApiKeyValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:maxWidth="160dp"
+                            android:singleLine="true"
+                            android:text="未配置"
+                            android:textColor="#8E8E93"
+                            android:textSize="14sp" />
+
+                        <ImageView
+                            android:id="@+id/ivApiKeyArrow"
+                            android:layout_width="8dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="6dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/qui_chevron_right" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/div3"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 4. 模型 -->
+                <RelativeLayout
+                    android:id="@+id/itemModel"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvModelLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="模型"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvModelValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:maxWidth="160dp"
+                            android:singleLine="true"
+                            android:text="deepseek-chat"
+                            android:textColor="#8E8E93"
+                            android:textSize="14sp" />
+
+                        <ImageView
+                            android:id="@+id/ivModelArrow"
+                            android:layout_width="8dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="6dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/qui_chevron_right" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/div4"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 5. 推理 -->
+                <RelativeLayout
+                    android:id="@+id/itemReasoning"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvReasoningLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="推理"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvReasoningValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="关闭"
+                            android:textColor="#8E8E93"
+                            android:textSize="14sp" />
+
+                        <ImageView
+                            android:id="@+id/ivReasoningArrow"
+                            android:layout_width="8dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="6dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/qui_chevron_right" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/div5"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 6. 测试链接 -->
+                <RelativeLayout
+                    android:id="@+id/itemTest"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvTestLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="测试链接"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ProgressBar
+                            android:id="@+id/pbTest"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:layout_marginEnd="6dp"
+                            android:visibility="gone" />
+
+                        <TextView
+                            android:id="@+id/tvTestStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#8E8E93"
+                            android:textSize="13sp" />
+
+                        <ImageView
+                            android:id="@+id/ivTestArrow"
+                            android:layout_width="8dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="6dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/qui_chevron_right" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+            </LinearLayout>
+
+            <!-- 分组 2：生成 -->
+            <TextView
+                android:id="@+id/tvGroup2Title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="7dp"
+                android:text="生成"
+                android:textColor="#8E8E93"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/cardParams"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:background="@drawable/bg_qq_card"
+                android:clipToOutline="true"
+                android:orientation="vertical">
+
+                <!-- 1. 角色 -->
+                <RelativeLayout
+                    android:id="@+id/itemRole"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvRoleLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="角色"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvRoleValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:maxWidth="160dp"
+                            android:singleLine="true"
+                            android:text="默认助手"
+                            android:textColor="#8E8E93"
+                            android:textSize="14sp" />
+
+                        <ImageView
+                            android:id="@+id/ivRoleArrow"
+                            android:layout_width="8dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="6dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/qui_chevron_right" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/divRoleTemp"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 2. 温度（内嵌式滑动调节） -->
+                <LinearLayout
+                    android:id="@+id/itemTempContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipChildren="false"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="14dp"
+                    android:paddingBottom="12dp">
+
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <TextView
+                            android:id="@+id/tvTempLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentStart="true"
+                            android:text="温度"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+
+                        <TextView
+                            android:id="@+id/tvTempValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:text="0.7"
+                            android:textColor="#8E8E93"
+                            android:textSize="14sp" />
+                    </RelativeLayout>
+
+                    <SeekBar
+                        android:id="@+id/sbTemp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:max="20"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp"
+                        android:splitTrack="false"
+                        android:progress="7" />
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- 分组 3：上下文 -->
+            <TextView
+                android:id="@+id/tvGroupContextTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="7dp"
+                android:text="上下文"
+                android:textColor="#8E8E93"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/cardContext"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:background="@drawable/bg_qq_card"
+                android:clipToOutline="true"
+                android:orientation="vertical">
+
+                <!-- 1. 上下文条数调节 -->
+                <LinearLayout
+                    android:id="@+id/itemContextCountContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipChildren="false"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="14dp"
+                    android:paddingBottom="12dp">
+
+                    <RelativeLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <TextView
+                            android:id="@+id/tvContextCountLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentStart="true"
+                            android:text="上下文条数"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+
+                        <TextView
+                            android:id="@+id/tvContextCountValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:text="5 条"
+                            android:textColor="#8E8E93"
+                            android:textSize="14sp" />
+                    </RelativeLayout>
+
+                    <SeekBar
+                        android:id="@+id/sbContextCount"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:max="100"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp"
+                        android:splitTrack="false"
+                        android:progress="5" />
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/divContext1"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 排除项子项容器 -->
+                <LinearLayout
+                    android:id="@+id/layoutExcludeOptions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <!-- 排除图片 -->
+                    <RelativeLayout
+                        android:id="@+id/itemExcludeImage"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@drawable/bg_qq_item_ripple"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:paddingHorizontal="16dp">
+
+                        <TextView
+                            android:id="@+id/tvExcludeImageLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_centerVertical="true"
+                            android:text="排除图片消息"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+
+                        <Switch
+                            android:id="@+id/switchExcludeImage"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:background="@null"
+                            android:showText="false"
+                            android:switchMinWidth="47dp"
+                            android:thumb="@drawable/switch_thumb_qui"
+                            android:track="@drawable/switch_track_qui" />
+                    </RelativeLayout>
+
+                    <View
+                        android:id="@+id/divContext2"
+                        android:layout_width="match_parent"
+                        android:layout_height="0.5dp"
+                        android:layout_marginStart="16dp"
+                        android:background="#14000000" />
+
+                    <!-- 排除表情 -->
+                    <RelativeLayout
+                        android:id="@+id/itemExcludeEmoji"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@drawable/bg_qq_item_ripple"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:paddingHorizontal="16dp">
+
+                        <TextView
+                            android:id="@+id/tvExcludeEmojiLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_centerVertical="true"
+                            android:text="排除表情与表情包"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+
+                        <Switch
+                            android:id="@+id/switchExcludeEmoji"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:background="@null"
+                            android:showText="false"
+                            android:switchMinWidth="47dp"
+                            android:thumb="@drawable/switch_thumb_qui"
+                            android:track="@drawable/switch_track_qui" />
+                    </RelativeLayout>
+
+                    <View
+                        android:id="@+id/divContext3"
+                        android:layout_width="match_parent"
+                        android:layout_height="0.5dp"
+                        android:layout_marginStart="16dp"
+                        android:background="#14000000" />
+
+                    <!-- 排除卡片 -->
+                    <RelativeLayout
+                        android:id="@+id/itemExcludeCard"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@drawable/bg_qq_item_ripple"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:paddingHorizontal="16dp">
+
+                        <TextView
+                            android:id="@+id/tvExcludeCardLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_centerVertical="true"
+                            android:text="排除卡片与小程序"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+
+                        <Switch
+                            android:id="@+id/switchExcludeCard"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:background="@null"
+                            android:showText="false"
+                            android:switchMinWidth="47dp"
+                            android:thumb="@drawable/switch_thumb_qui"
+                            android:track="@drawable/switch_track_qui" />
+                    </RelativeLayout>
+
+                    <View
+                        android:id="@+id/divContext4"
+                        android:layout_width="match_parent"
+                        android:layout_height="0.5dp"
+                        android:layout_marginStart="16dp"
+                        android:background="#14000000" />
+
+                    <!-- 排除语音 -->
+                    <RelativeLayout
+                        android:id="@+id/itemExcludeVoice"
+                        android:layout_width="match_parent"
+                        android:layout_height="52dp"
+                        android:background="@drawable/bg_qq_item_ripple"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:paddingHorizontal="16dp">
+
+                        <TextView
+                            android:id="@+id/tvExcludeVoiceLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_centerVertical="true"
+                            android:text="排除语音消息"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+
+                        <Switch
+                            android:id="@+id/switchExcludeVoice"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_alignParentEnd="true"
+                            android:layout_centerVertical="true"
+                            android:background="@null"
+                            android:showText="false"
+                            android:switchMinWidth="47dp"
+                            android:thumb="@drawable/switch_thumb_qui"
+                            android:track="@drawable/switch_track_qui" />
+                    </RelativeLayout>
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- 分组 4：发送 -->
+            <TextView
+                android:id="@+id/tvGroup3Title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="7dp"
+                android:text="发送"
+                android:textColor="#8E8E93"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/cardSend"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:background="@drawable/bg_qq_card"
+                android:clipToOutline="true"
+                android:orientation="vertical">
+
+                <!-- 1. 引用发送 -->
+                <RelativeLayout
+                    android:id="@+id/itemQuoteOnSend"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvQuoteOnSendLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="引用发送"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <Switch
+                        android:id="@+id/switchQuoteOnSend"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:background="@null"
+                        android:showText="false"
+                        android:switchMinWidth="47dp"
+                        android:thumb="@drawable/switch_thumb_qui"
+                        android:track="@drawable/switch_track_qui" />
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/divSend1"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 2. 多项候选回复 -->
+                <RelativeLayout
+                    android:id="@+id/itemMultiChoice"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvMultiChoiceLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="多项候选回复"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+
+                        <TextView
+                            android:id="@+id/tvMultiChoiceDesc"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="生成多条不同侧重点与风格的候选回复供选择"
+                            android:textColor="#8E8E93"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <Switch
+                        android:id="@+id/switchMultiChoice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:background="@null"
+                        android:showText="false"
+                        android:switchMinWidth="47dp"
+                        android:thumb="@drawable/switch_thumb_qui"
+                        android:track="@drawable/switch_track_qui" />
+                </RelativeLayout>
+
+            </LinearLayout>
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- 顶栏：半透明悬浮在顶部，类似 QQ 原生毛玻璃/半透明沉浸效果 -->
+    <LinearLayout
+        android:id="@+id/topBarContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#F0F5F6F8"
+        android:orientation="vertical">
+
+        <!-- 状态栏占位 View，由 Activity 动态设置高度以完美实现全屏沉浸 -->
+        <View
+            android:id="@+id/statusBarPlaceholder"
+            android:layout_width="match_parent"
+            android:layout_height="0dp" />
+
+        <RelativeLayout
+            android:id="@+id/topBar"
+            android:layout_width="match_parent"
+            android:layout_height="48dp">
+
+            <ImageView
+                android:id="@+id/btnClose"
+                android:layout_width="48dp"
+                android:layout_height="match_parent"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:contentDescription="返回"
+                android:focusable="true"
+                android:padding="14dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/qui_chevron_left" />
+
+            <TextView
+                android:id="@+id/tvTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:text="QAI 设置"
+                android:textColor="#000000"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+        </RelativeLayout>
+
+        <View
+            android:id="@+id/topDivider"
+            android:layout_width="match_parent"
+            android:layout_height="0.5dp"
+            android:background="#0A000000" />
+    </LinearLayout>
+
+</FrameLayout>
