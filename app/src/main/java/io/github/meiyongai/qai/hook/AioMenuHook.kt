@@ -21,7 +21,31 @@ import java.util.Locale
 import org.json.JSONException
 import org.json.JSONObject
 
-data class MessagePayload(val text: String, val imagePaths: List<String>)
+/**
+ * 描述单张多模态图片的上下文归属信息。
+ *
+ * @property tag 文本中对应的锚定标签（例如 [图片 #1]）。
+ * @property imagePath 本地图片文件的绝对路径。
+ * @property sender 发送该图片的群友或好友昵称。
+ * @property timeStr 发送时间戳字符串（例如 21:05）。
+ * @property isTargetMsg 是否来源于当前长按的目标消息本身。
+ */
+data class ImageOriginInfo(
+    val tag: String,
+    val imagePath: String,
+    val sender: String,
+    val timeStr: String,
+    val isTargetMsg: Boolean = false
+)
+
+data class MessagePayload(
+    val text: String,
+    val imagePaths: List<String>,
+    val sessionId: String = "",
+    val sessionTitle: String = "",
+    val sessionType: String = "FRIEND",
+    val imageInfos: List<ImageOriginInfo> = emptyList()
+)
 
 private data class MessageClassifier(
     val hasText: Boolean,
@@ -169,7 +193,10 @@ object AioMenuHook {
                                                             imagePaths = payload.imagePaths,
                                                             quoteAction = quoteAction,
                                                             contact = contact,
-                                                            targetMsgItem = msgItem
+                                                            targetMsgItem = msgItem,
+                                                            sessionId = payload.sessionId,
+                                                            sessionTitle = payload.sessionTitle,
+                                                            sessionType = payload.sessionType
                                                         ).show()
                                                     }
                                                 }
@@ -264,58 +291,105 @@ object AioMenuHook {
             }
         }
 
+        val targetSender = extractSenderName(msgItem, msgRecord)
         var currentMsgText = extractStructuredTextFromMsgItem(msgItem)?.trim() ?: ""
-
-        val isGenericPlaceholder = currentMsgText.isEmpty() ||
-                currentMsgText == "[聊天记录]" ||
-                currentMsgText == "[合并转发]" ||
-                currentMsgText == "[卡片消息]" ||
-                currentMsgText == "聊天记录" ||
-                currentMsgText == "合并转发" ||
-                currentMsgText == "卡片消息"
-
-        if (component != null) {
-            val view = extractViewFromComponent(component)
-            if (view != null) {
-                val viewText = extractTextFromViewHierarchy(view)
-                if (!viewText.isNullOrBlank()) {
-                    if (isGenericPlaceholder || viewText.lines().size > currentMsgText.lines().size) {
-                        currentMsgText = viewText.trim()
-                        Log.i(TAG, "Successfully extracted detailed text from component View hierarchy: '$currentMsgText'")
-                    }
-                }
-            }
-        }
 
         // 3. 检查用户是否配置了上下文消息条数，并提取上下文文本行与关联的图片路径
         val contextCount = LlmConfig.getContextCount(context)
         val contextHistory = if (contextCount > 0 && component != null) {
             extractContextHistory(context, component, msgItem, contextCount)
         } else {
-            ContextHistory(emptyList(), emptyList())
+            ContextHistory(emptyList(), emptyList(), emptyList())
         }
 
-        val targetSender = extractSenderName(msgItem, msgRecord)
         val sessionScene = extractSessionScene(context, msgItem, msgRecord)
 
-        val promptBuilder = StringBuilder()
-        promptBuilder.append("【会话场景】").append(sessionScene).append("\n")
+        val chatType = (getFieldValueRecursive(msgRecord ?: msgItem, "chatType") as? Int) ?: 1
+        val peerUid = (getFieldValueRecursive(msgRecord ?: msgItem, "peerUid") as? String) ?: ""
+        val sessionType = if (chatType == 2) "GROUP" else "FRIEND"
+        val sessionId = if (chatType == 2) "group_$peerUid" else "friend_$peerUid"
+        var peerName = (getFieldValueRecursive(msgRecord ?: msgItem, "peerName") as? String)?.trim() ?: ""
+        if (peerName.isBlank() && context is Activity) {
+            val actTitle = context.title?.toString()?.trim() ?: ""
+            if (actTitle.isNotBlank() && actTitle != "QQ") {
+                peerName = actTitle
+            }
+        }
+        val sessionTitle = peerName.ifBlank { sessionId }
 
-        if (contextHistory.lines.isNotEmpty()) {
-            promptBuilder.append("\n【前序背景记录】\n")
-            for (historyLine in contextHistory.lines) {
-                promptBuilder.append(historyLine).append("\n")
+        val now = java.util.Calendar.getInstance()
+        val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm (E)", Locale.getDefault())
+        val currentTimeStr = sdf.format(now.time)
+
+        // 统一收集与对齐所有多模态图片（上下文历史图片 + 目标消息直接/引用图片）
+        val allVisualInfos = mutableListOf<ImageOriginInfo>()
+        allVisualInfos.addAll(contextHistory.imageInfos)
+
+        var imageCounter = contextHistory.imageInfos.size + 1
+        val targetAllPics = (targetDirectImages + quotedImages).distinct()
+        if (targetAllPics.isNotEmpty()) {
+            val targetTags = mutableListOf<String>()
+            for (pic in targetAllPics) {
+                val f = File(pic)
+                if (f.exists() && f.isFile && f.length() > 0) {
+                    val tag = "[图片 #$imageCounter]"
+                    targetTags.add(tag)
+                    allVisualInfos.add(
+                        ImageOriginInfo(
+                            tag = tag,
+                            imagePath = pic,
+                            sender = targetSender,
+                            timeStr = "当前",
+                            isTargetMsg = true
+                        )
+                    )
+                    imageCounter++
+                }
+            }
+            if (targetTags.isNotEmpty()) {
+                val tagsStr = targetTags.joinToString(" ")
+                currentMsgText = when {
+                    currentMsgText.contains("[图片]") -> currentMsgText.replace("[图片]", tagsStr)
+                    currentMsgText.isBlank() -> tagsStr
+                    else -> "$currentMsgText $tagsStr"
+                }
             }
         }
 
-        promptBuilder.append("\n【当前要回复的目标消息】\n")
-        val targetContent = if (currentMsgText.isNotEmpty()) currentMsgText else "[图片/卡片消息]"
-        promptBuilder.append(targetSender).append(": ").append(targetContent)
+        val promptBuilder = StringBuilder()
+        promptBuilder.append("<system_context>\n")
+        promptBuilder.append("Current Time: ").append(currentTimeStr).append("\n")
+        promptBuilder.append("Scene: ").append(sessionScene).append("\n")
+        promptBuilder.append("Target Sender: ").append(targetSender).append("\n")
+        promptBuilder.append("</system_context>\n\n")
+
+        if (contextHistory.lines.isNotEmpty()) {
+            promptBuilder.append("<chat_history>\n")
+            for (historyLine in contextHistory.lines) {
+                promptBuilder.append(historyLine).append("\n")
+            }
+            promptBuilder.append("</chat_history>\n\n")
+        }
+
+        val targetContent = if (currentMsgText.isNotEmpty()) currentMsgText else "[消息]"
+        promptBuilder.append("<target_message>\n")
+        promptBuilder.append(targetContent).append("\n")
+        promptBuilder.append("</target_message>\n\n")
+
+        // 4. 若涉及图片，注入客观的视觉图片映射与来源归属
+        if (allVisualInfos.isNotEmpty()) {
+            promptBuilder.append("<visual_context>\n")
+            for (info in allVisualInfos) {
+                val srcDesc = if (info.isTargetMsg) "当前目标消息附带配图" else "由 ${info.sender} 于 ${info.timeStr.ifEmpty { "前序" }} 发送"
+                promptBuilder.append("- ${info.tag}: $srcDesc\n")
+            }
+            promptBuilder.append("</visual_context>\n\n")
+        }
 
         val finalText = promptBuilder.toString().trim()
 
-        // 4. 聚合所有相关的图片文件（目标消息图片 -> 引用溯源图片 -> 上下文历史图片，限制最多 5 张）
-        val combinedImages = (targetDirectImages + quotedImages + contextHistory.imagePaths)
+        val combinedImages = allVisualInfos
+            .map { it.imagePath }
             .filter { path ->
                 val f = File(path)
                 f.exists() && f.isFile && f.length() > 0
@@ -323,19 +397,27 @@ object AioMenuHook {
             .distinct()
             .take(5)
 
-        val finalPayload = MessagePayload(finalText, combinedImages)
-        Log.i(TAG, "extractMessagePayload result: contextLines=${contextHistory.lines.size}, text='${finalPayload.text}', imageCount=${finalPayload.imagePaths.size}")
+        val finalPayload = MessagePayload(
+            text = finalText,
+            imagePaths = combinedImages,
+            sessionId = sessionId,
+            sessionTitle = sessionTitle,
+            sessionType = sessionType,
+            imageInfos = allVisualInfos
+        )
+        Log.i(TAG, "extractMessagePayload result: sessionId=$sessionId, contextLines=${contextHistory.lines.size}, textLen=${finalPayload.text.length}, imageCount=${finalPayload.imagePaths.size}")
         return finalPayload
     }
 
     /**
      * 上下文历史提取结果数据载体。
      *
-     * 封装前序自然时序历史消息行文本列表与历史记录中包含的本地有效图片路径列表。
+     * 封装前序自然时序历史消息行文本列表、历史图片路径列表以及对应的图片归属信息。
      */
     data class ContextHistory(
         val lines: List<String>,
-        val imagePaths: List<String>
+        val imagePaths: List<String>,
+        val imageInfos: List<ImageOriginInfo> = emptyList()
     )
 
     /**
@@ -396,17 +478,51 @@ object AioMenuHook {
 
         val resultLines = mutableListOf<String>()
         val resultImages = mutableListOf<String>()
+        val resultImageInfos = mutableListOf<ImageOriginInfo>()
+        val timeSdf = java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
+        var contextImgCounter = 1
+
         for (item in candidateItems) {
             val record = extractMsgRecord(item)
             val sender = extractSenderName(item, record)
-            val text = extractSingleMessageText(item)
-            if (text.isNotBlank()) {
-                resultLines.add("$sender: $text")
-            }
+            var text = extractSingleMessageText(item)
+            val msgTime = (getFieldValueRecursive(record, "msgTime") as? Long) ?: 0L
+            val timeStr = if (msgTime > 0L) timeSdf.format(java.util.Date(msgTime * 1000L)) else ""
+            val timePrefix = if (timeStr.isNotEmpty()) "[$timeStr] " else ""
+
             val pics = extractPicPathsFromMsgItem(item)
-            resultImages.addAll(pics)
+            if (pics.isNotEmpty()) {
+                val assignedTags = mutableListOf<String>()
+                for (pic in pics) {
+                    val tag = "[图片 #$contextImgCounter]"
+                    assignedTags.add(tag)
+                    resultImageInfos.add(
+                        ImageOriginInfo(
+                            tag = tag,
+                            imagePath = pic,
+                            sender = sender,
+                            timeStr = timeStr,
+                            isTargetMsg = false
+                        )
+                    )
+                    resultImages.add(pic)
+                    contextImgCounter++
+                }
+                val tagsStr = assignedTags.joinToString(" ")
+                text = when {
+                    text.contains("[图片]") -> text.replace("[图片]", tagsStr)
+                    text.isBlank() -> tagsStr
+                    else -> "$text $tagsStr"
+                }
+            } else if (text.isBlank()) {
+                text = "[图片]"
+            }
+
+            if (text.isNotBlank()) {
+                resultLines.add("$timePrefix$sender: $text")
+            }
         }
-        return ContextHistory(resultLines, resultImages)
+        return ContextHistory(resultLines, resultImages, resultImageInfos)
     }
 
     /**
@@ -469,10 +585,29 @@ object AioMenuHook {
                 }
             }
 
-            // 2. 若无原图，遍历 thumbPath 缩略图映射
+            // 2. 检查 direct 路径属性 (downloadPath, filePath)
+            val downloadPath = getFieldValueRecursive(picElem, "downloadPath") as? String
+            if (!downloadPath.isNullOrBlank()) {
+                val f = File(downloadPath)
+                if (f.exists() && f.isFile && f.length() > 0) {
+                    validPaths.add(downloadPath)
+                    continue
+                }
+            }
+
+            val filePath = getFieldValueRecursive(picElem, "filePath") as? String
+            if (!filePath.isNullOrBlank()) {
+                val f = File(filePath)
+                if (f.exists() && f.isFile && f.length() > 0) {
+                    validPaths.add(filePath)
+                    continue
+                }
+            }
+
+            // 3. 遍历 thumbPath 缩略图映射
             val thumbPathMap = getFieldValueRecursive(picElem, "thumbPath") as? Map<*, *>
+            var foundThumb: String? = null
             if (!thumbPathMap.isNullOrEmpty()) {
-                var foundThumb: String? = null
                 for (v in thumbPathMap.values) {
                     val p = v as? String ?: continue
                     if (p.isNotBlank()) {
@@ -483,12 +618,41 @@ object AioMenuHook {
                         }
                     }
                 }
-                if (foundThumb != null) {
-                    validPaths.add(foundThumb)
+            }
+            if (foundThumb != null) {
+                validPaths.add(foundThumb)
+                continue
+            }
+
+            // 4. 反射遍历 picElem 中所有以 '/' 开头的有效绝对路径字段
+            var foundReflectPath: String? = null
+            try {
+                var c: Class<*>? = picElem.javaClass
+                while (c != null && c != Any::class.java) {
+                    for (fld in c.declaredFields) {
+                        if (fld.type == String::class.java) {
+                            fld.isAccessible = true
+                            val strVal = fld.get(picElem) as? String
+                            if (!strVal.isNullOrBlank() && strVal.startsWith("/") && !strVal.contains("http")) {
+                                val file = File(strVal)
+                                if (file.exists() && file.isFile && file.length() > 0) {
+                                    foundReflectPath = strVal
+                                    break
+                                }
+                            }
+                        }
+                    }
+                    if (foundReflectPath != null) break
+                    c = c.superclass
                 }
+            } catch (_: Throwable) {
+            }
+
+            if (foundReflectPath != null) {
+                validPaths.add(foundReflectPath)
             }
         }
-        return validPaths
+        return validPaths.distinct()
     }
 
     /**
@@ -616,8 +780,9 @@ object AioMenuHook {
      *
      * Callers:
      *     - `AioMenuHook.kt:AioMenuHook.extractContextHistory`
+     *     - `AioInputHelper.kt:AioInputHelper.sendDirectMessage`
      */
-    private fun extractSenderName(msgItem: Any, msgRecord: Any?): String {
+    fun extractSenderName(msgItem: Any, msgRecord: Any?): String {
         if (isMessageSentBySelf(msgItem, msgRecord)) {
             return "我"
         }
@@ -940,8 +1105,8 @@ object AioMenuHook {
             val xmlContent = (getFieldValueRecursive(multiForwardElem, "xmlContent") as? String)
                 ?: (getFieldValueRecursive(multiForwardElem, "xml") as? String)
             if (!xmlContent.isNullOrBlank()) {
-                val forwardText = parseStructMsgXml(xmlContent)
-                if (!forwardText.isNullOrBlank()) return forwardText
+                val fullText = parseFullMultiForwardXml(xmlContent)
+                if (!fullText.isNullOrBlank()) return fullText
             }
 
             val summaryList = (getFieldValueRecursive(multiForwardElem, "summaryList") as? List<*>)
@@ -952,7 +1117,7 @@ object AioMenuHook {
                 val sb = StringBuilder()
                 sb.append("[合并转发: ").append(title ?: "聊天记录").append("]\n")
                 summaryList.filterIsInstance<String>().forEach { summary ->
-                    sb.append(summary).append("\n")
+                    sb.append("- ").append(summary).append("\n")
                 }
                 return sb.toString().trim()
             }
@@ -1085,6 +1250,74 @@ object AioMenuHook {
             }
         }
 
+        return sb.toString().trim().ifEmpty { null }
+    }
+
+    /**
+     * 深度解析合并转发卡片 XML，递归提取所有的消息条目、时间戳、发送人及内容。
+     *
+     * 优先解析标准 XML 树中的所有 <item> 块，提取所有 <title>、<summary>、<text>，
+     * 展平所有子发言人与内容，确保数十条记录全量还原而非仅显示粗略预览。
+     *
+     * Args:
+     *     xmlContent (String): 合并转发卡片 XML 原始报文。
+     *
+     * Returns:
+     *     String?: 格式化后的完整聊天记录明细文本，若无有效信息则返回 null。
+     *
+     * Callers:
+     *     - `AioMenuHook.kt:AioMenuHook.extractElementText`
+     */
+    private fun parseFullMultiForwardXml(xmlContent: String): String? {
+        if (xmlContent.isBlank()) return null
+
+        val briefRegex = Regex("""brief=["']([^"']+)["']""")
+        val rawBrief = briefRegex.find(xmlContent)?.groupValues?.getOrNull(1)?.trim()
+        val brief = rawBrief?.let { cleanXmlText(it) }
+
+        val titleRegex = Regex("""<title[^>]*>(.*?)</title>""", RegexOption.DOT_MATCHES_ALL)
+        val rawTitle = titleRegex.find(xmlContent)?.groupValues?.getOrNull(1)?.trim()
+        val title = rawTitle?.let { cleanXmlText(it) }
+
+        val headerTitle = if (!title.isNullOrBlank()) title else if (!brief.isNullOrBlank()) brief else "聊天记录"
+
+        // 提取所有 item 块
+        val itemRegex = Regex("""<item[^>]*>(.*?)</item>""", RegexOption.DOT_MATCHES_ALL)
+        val itemMatches = itemRegex.findAll(xmlContent).toList()
+
+        val recordLines = mutableListOf<String>()
+
+        if (itemMatches.isNotEmpty()) {
+            for (match in itemMatches) {
+                val itemBody = match.groupValues.getOrNull(1) ?: continue
+                val textTags = Regex("""<(?:summary|title|text|p)[^>]*>(.*?)</(?:summary|title|text|p)>""", RegexOption.DOT_MATCHES_ALL)
+                val lines = textTags.findAll(itemBody)
+                    .map { cleanXmlText(it.groupValues.getOrNull(1)?.trim().orEmpty()) }
+                    .filter { it.isNotBlank() }
+                    .toList()
+                if (lines.isNotEmpty()) {
+                    recordLines.add(lines.joinToString(" "))
+                }
+            }
+        }
+
+        if (recordLines.isEmpty()) {
+            val summaryRegex = Regex("""<summary[^>]*>(.*?)</summary>""", RegexOption.DOT_MATCHES_ALL)
+            recordLines.addAll(
+                summaryRegex.findAll(xmlContent)
+                    .map { cleanXmlText(it.groupValues.getOrNull(1)?.trim().orEmpty()) }
+                    .filter { it.isNotBlank() }
+            )
+        }
+
+        if (recordLines.isEmpty()) return null
+
+        val sb = StringBuilder()
+        sb.append("[合并转发: ").append(headerTitle).append("]\n")
+        val contentLines = if (recordLines.isNotEmpty() && recordLines[0] == headerTitle) recordLines.drop(1) else recordLines
+        for (line in contentLines) {
+            sb.append("- ").append(line).append("\n")
+        }
         return sb.toString().trim().ifEmpty { null }
     }
 
@@ -1536,74 +1769,6 @@ object AioMenuHook {
             sb.append(line).append("\n")
         }
         return sb.toString().trim()
-    }
-
-    /**
-     * 递归遍历组件根视图树以提取所有可见 TextView 中的展示文本。
-     *
-     * 当长按触发的卡片（如合并转发卡片、Ark 小程序、图文卡片等）在底层数据模型未暴露或结构变化时，
-     * 直接穿透屏幕已渲染的视图节点收集标题、各条预览记录与底部摘要，保证文本获取的完整性。
-     *
-     * Args:
-     *     rootView (View): 组件关联的根视图对象。
-     *
-     * Returns:
-     *     String?: 格式化后的多行展示文本，未收集到有效文字时返回 null。
-     *
-     * Callers:
-     *     - `AioMenuHook.kt:AioMenuHook.extractMessagePayload`
-     */
-    private fun extractTextFromViewHierarchy(rootView: View): String? {
-        val collectedLines = mutableListOf<String>()
-        collectVisibleTextViews(rootView, collectedLines)
-        if (collectedLines.isEmpty()) return null
-
-        val sb = StringBuilder()
-        val firstLine = collectedLines[0]
-        if (firstLine.contains("聊天记录") || firstLine.contains("转发")) {
-            sb.append("[合并转发: ").append(firstLine).append("]\n")
-            for (i in 1 until collectedLines.size) {
-                sb.append(collectedLines[i]).append("\n")
-            }
-        } else {
-            for (line in collectedLines) {
-                sb.append(line).append("\n")
-            }
-        }
-        return sb.toString().trim()
-    }
-
-    /**
-     * 深度优先遍历视图树以收集符合条件的可见 TextView 内容并去重过滤。
-     *
-     * 过滤系统角标、空白字符以及完全相同的相邻重复行。
-     *
-     * Args:
-     *     view (View): 当前遍历的视图节点。
-     *     result (MutableList<String>): 用于收集各行文本的容器列表。
-     *
-     * Returns:
-     *     Unit: 无返回值。
-     *
-     * Callers:
-     *     - `AioMenuHook.kt:AioMenuHook.extractTextFromViewHierarchy`
-     */
-    private fun collectVisibleTextViews(view: View, result: MutableList<String>) {
-        if (view.visibility != View.VISIBLE) return
-
-        if (view is android.widget.TextView) {
-            val textStr = view.text?.toString()?.trim()
-            if (!textStr.isNullOrBlank() && !result.contains(textStr)) {
-                result.add(textStr)
-            }
-            return
-        }
-
-        if (view is ViewGroup) {
-            for (i in 0 until view.childCount) {
-                collectVisibleTextViews(view.getChildAt(i), result)
-            }
-        }
     }
 
     /**

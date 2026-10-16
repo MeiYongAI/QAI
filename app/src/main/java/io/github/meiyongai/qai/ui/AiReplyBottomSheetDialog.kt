@@ -26,9 +26,19 @@ import android.widget.TextView
 import android.widget.Toast
 import io.github.meiyongai.qai.R
 import io.github.meiyongai.qai.hook.AioInputHelper
+import io.github.meiyongai.qai.hook.ImageOriginInfo
 import io.github.meiyongai.qai.llm.config.LlmConfig
+import io.github.meiyongai.qai.llm.memory.ContextCompressor
+import io.github.meiyongai.qai.llm.memory.SessionMemoryManager
 import io.github.meiyongai.qai.llm.net.StreamChatClient
 import io.github.meiyongai.qai.llm.utils.ModelUtil
+import io.github.meiyongai.qai.llm.vision.VisionCaptionService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class AiReplyBottomSheetDialog(
     private val activity: Activity,
@@ -36,7 +46,11 @@ class AiReplyBottomSheetDialog(
     private val imagePaths: List<String> = emptyList(),
     private val quoteAction: (() -> Unit)? = null,
     private val contact: Any? = null,
-    private val targetMsgItem: Any? = null
+    private val targetMsgItem: Any? = null,
+    private val sessionId: String = "",
+    private val sessionTitle: String = "",
+    private val sessionType: String = "FRIEND",
+    private val imageInfos: List<ImageOriginInfo> = emptyList()
 ) : Dialog(activity, android.R.style.Theme_Translucent_NoTitleBar) {
 
     constructor(
@@ -45,15 +59,25 @@ class AiReplyBottomSheetDialog(
         imagePath: String?,
         quoteAction: (() -> Unit)? = null,
         contact: Any? = null,
-        targetMsgItem: Any? = null
+        targetMsgItem: Any? = null,
+        sessionId: String = "",
+        sessionTitle: String = "",
+        sessionType: String = "FRIEND",
+        imageInfos: List<ImageOriginInfo> = emptyList()
     ) : this(
         activity = activity,
         originPrompt = originPrompt,
         imagePaths = if (imagePath != null) listOf(imagePath) else emptyList(),
         quoteAction = quoteAction,
         contact = contact,
-        targetMsgItem = targetMsgItem
+        targetMsgItem = targetMsgItem,
+        sessionId = sessionId,
+        sessionTitle = sessionTitle,
+        sessionType = sessionType,
+        imageInfos = imageInfos
     )
+
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     private val fullResponse = StringBuilder()
     private val reasoningBuilder = StringBuilder()
@@ -162,6 +186,7 @@ class AiReplyBottomSheetDialog(
         if (isDismissing) return
         isDismissing = true
         streamClient?.cancel()
+        scope.cancel()
         if (::sheetLayout.isInitialized && sheetLayout.isAttachedToWindow) {
             val targetY = if (sheetLayout.height > 0) sheetLayout.height.toFloat() else dp(500).toFloat()
             if (::maskView.isInitialized) {
@@ -879,7 +904,11 @@ class AiReplyBottomSheetDialog(
             setOnClickListener {
                 val targetText = getTargetTextToOperate()
                 if (targetText.isNotEmpty()) {
-                    if (AioInputHelper.insertTextToInput(targetText)) {
+                    val targetNick = targetMsgItem?.let {
+                        val r = io.github.meiyongai.qai.hook.AioMenuHook.extractMsgRecord(it)
+                        io.github.meiyongai.qai.hook.AioMenuHook.extractSenderName(it, r)
+                    }
+                    if (AioInputHelper.insertTextToInput(targetText, targetNick)) {
                         Toast.makeText(activity, "已填入输入框", Toast.LENGTH_SHORT).show()
                         dismiss()
                     } else {
@@ -914,6 +943,10 @@ class AiReplyBottomSheetDialog(
                 if (targetText.isNotEmpty()) {
                     val isQuote = LlmConfig.isQuoteOnSend(activity)
                     val replyTarget = if (isQuote) targetMsgItem else null
+                    val targetNick = targetMsgItem?.let {
+                        val r = io.github.meiyongai.qai.hook.AioMenuHook.extractMsgRecord(it)
+                        io.github.meiyongai.qai.hook.AioMenuHook.extractSenderName(it, r)
+                    }
 
                     // 优先采用 QQNT 底层内核消息服务静默直接投递，彻底绕过界面输入框
                     if (contact != null) {
@@ -921,16 +954,19 @@ class AiReplyBottomSheetDialog(
                             context = activity,
                             contact = contact,
                             text = targetText,
-                            replyMsgItem = replyTarget
+                            replyMsgItem = replyTarget,
+                            targetSenderNick = targetNick
                         )
                         if (directSuccess) {
+                            recordSentConversation(targetText)
                             dismiss()
                             return@setOnClickListener
                         }
                     }
 
                     val actionToQuote = if (isQuote) quoteAction else null
-                    AioInputHelper.sendText(activity, targetText, actionToQuote)
+                    AioInputHelper.sendText(activity, targetText, actionToQuote, targetNick)
+                    recordSentConversation(targetText)
                     dismiss()
                 } else {
                     Toast.makeText(activity, "内容为空", Toast.LENGTH_SHORT).show()
@@ -969,10 +1005,12 @@ class AiReplyBottomSheetDialog(
         }
     }
 
+
     /**
      * 读取用户当前配置并向大模型服务商发起流式生成请求。
      *
-     * 检查服务商地址有效性与密钥配置，通过 SSE 协议接收推理思考流与正式回复流并动态更新界面；
+     * 检查服务商地址有效性与密钥配置，若开启了独立图片理解服务则并发反推图片事实并注入 Prompt，
+     * 通过 SSE 协议接收推理思考流与正式回复流并动态更新界面；
      * 根据生成完成与终止状态动态切换底部操作栏为完成态。
      *
      * Callers:
@@ -1004,24 +1042,44 @@ class AiReplyBottomSheetDialog(
             return
         }
 
-        val isMultiChoice = LlmConfig.isMultiChoiceEnabled(activity)
-        val effectiveUserPrompt = if (isMultiChoice) {
-            "$originPrompt\n\n【行动指令】请针对上述目标消息直接回复。严格按照角色设定给出多条纯台词回复，每条前面单独一行写 <<<OPTION>>>。严禁任何情境分析或前言！"
-        } else {
-            originPrompt
-        }
+        val memoryPrefix = buildMemoryPrefix(activity, sessionId)
 
-        streamClient = StreamChatClient().apply {
-            startStream(
-                baseUrl = baseUrl,
-                apiKey = apiKey,
-                model = model,
-                systemPrompt = systemPrompt,
-                userPrompt = effectiveUserPrompt,
-                imagePaths = imagePaths,
-                temperature = temperature,
-                reasoningEffort = reasoningEffort,
-                callback = object : StreamChatClient.Callback {
+        val isMultiChoice = LlmConfig.isMultiChoiceEnabled(activity)
+
+        scope.launch {
+            var promptWithVision = originPrompt
+            if (imagePaths.isNotEmpty() && LlmConfig.isVisionCaptionReady(activity)) {
+                tvContent.text = "正在理解图像事实..."
+                val captions = withContext(Dispatchers.IO) {
+                    VisionCaptionService.getCaptionsForImages(activity, imagePaths)
+                }
+                if (captions.isNotEmpty()) {
+                    for (info in imageInfos) {
+                        val cap = captions[info.imagePath]
+                        if (!cap.isNullOrBlank()) {
+                            promptWithVision = promptWithVision.replace(info.tag, "${info.tag} [画面内容: $cap]")
+                        }
+                    }
+                }
+            }
+
+            val effectiveUserPrompt = if (isMultiChoice) {
+                "$memoryPrefix$promptWithVision\n\n【行动指令】请针对上述目标消息直接回复。严格按照角色设定给出多条纯台词回复，每条前面单独一行写 <<<OPTION>>>。严禁任何情境分析或前言！"
+            } else {
+                "$memoryPrefix$promptWithVision"
+            }
+
+            streamClient = StreamChatClient().apply {
+                startStream(
+                    baseUrl = baseUrl,
+                    apiKey = apiKey,
+                    model = model,
+                    systemPrompt = systemPrompt,
+                    userPrompt = effectiveUserPrompt,
+                    imagePaths = imagePaths,
+                    temperature = temperature,
+                    reasoningEffort = reasoningEffort,
+                    callback = object : StreamChatClient.Callback {
                     override fun onReasoning(chunk: String) {
                         if (reasoningEffort <= LlmConfig.REASONING_OFF) {
                             // 用户在设置中关闭了推理！忽略所有思维链内容，坚决不显示思考框
@@ -1118,5 +1176,72 @@ class AiReplyBottomSheetDialog(
                 }
             )
         }
+    }
+}
+
+    /**
+     * 将当前发送成功的对白轮次记录到本地持久化会话记忆数据库中，并触发智能压缩判定。
+     *
+     * Args:
+     *     replyText (String): 最终确定发送的回复正文。
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiReplyBottomSheetDialog.kt:AiReplyBottomSheetDialog.buildDialogView`
+     */
+    private fun recordSentConversation(replyText: String) {
+        if (sessionId.isNotBlank() && LlmConfig.isSessionMemoryEnabled(activity)) {
+            SessionMemoryManager.saveTurn(
+                context = activity,
+                sessionId = sessionId,
+                title = sessionTitle,
+                sceneType = sessionType,
+                userPrompt = originPrompt,
+                assistantReply = replyText
+            )
+            ContextCompressor.triggerCompressionIfNeeded(activity, sessionId)
+        }
+    }
+
+    /**
+     * 根据会话标识与记忆配置构建结构化上下文记忆前缀字符串。
+     *
+     * 整合由大模型压缩提炼的长期事实提要（<long_term_memory>）
+     * 与本地保留的最近若干轮精确对白记录（<session_history>），全面对齐 AstrBot 会话记忆模型。
+     *
+     * Args:
+     *     context (android.content.Context): Android 上下文对象。
+     *     targetSessionId (String): 当前交互所在的会话唯一标识符。
+     *
+     * Returns:
+     *     String: 组装完成的结构化记忆提示词前缀，未开启或无数据时返回空字符串。
+     *
+     * Callers:
+     *     - `AiReplyBottomSheetDialog.kt:AiReplyBottomSheetDialog.startAiRequest`
+     */
+    private fun buildMemoryPrefix(context: android.content.Context, targetSessionId: String): String {
+        if (targetSessionId.isBlank() || !LlmConfig.isSessionMemoryEnabled(context)) {
+            return ""
+        }
+        val session = SessionMemoryManager.getSession(context, targetSessionId) ?: return ""
+        val sb = StringBuilder()
+        if (session.summary.isNotBlank()) {
+            sb.append("<long_term_memory>\n【本会话长期事实记忆提要】\n")
+                .append(session.summary)
+                .append("\n</long_term_memory>\n\n")
+        }
+        if (session.turns.isNotEmpty()) {
+            val keepTurns = LlmConfig.getContextCompressKeepTurns(context)
+            val recentTurns = session.turns.takeLast(keepTurns)
+            sb.append("<session_history>\n【本会话近期交互记录】\n")
+            for (turn in recentTurns) {
+                sb.append("User: ").append(turn.userPrompt).append("\n")
+                sb.append("Assistant: ").append(turn.assistantReply).append("\n")
+            }
+            sb.append("</session_history>\n\n")
+        }
+        return sb.toString()
     }
 }

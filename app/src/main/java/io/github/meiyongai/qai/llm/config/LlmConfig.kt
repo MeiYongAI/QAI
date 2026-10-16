@@ -34,7 +34,27 @@ object LlmConfig {
     private const val KEY_CACHED_MODELS_PREFIX = "qai_cached_models_"
 
     const val DEFAULT_CONTEXT_COUNT = 5
-    const val MAX_CONTEXT_COUNT = 100
+    const val MAX_CONTEXT_COUNT = 1000
+
+    // 会话记忆与上下文压缩配置项
+    private const val KEY_SESSION_MEMORY_ENABLED = "qai_session_memory_enabled"
+    private const val KEY_CONTEXT_COMPRESS_ENABLED = "qai_context_compress_enabled"
+    private const val KEY_CONTEXT_COMPRESS_THRESHOLD = "qai_context_compress_threshold"
+    private const val KEY_CONTEXT_COMPRESS_KEEP_TURNS = "qai_context_compress_keep_turns"
+
+    // 独立视觉/图片理解（Image Captioning）配置项
+    private const val KEY_VISION_CAPTION_ENABLED = "qai_vision_caption_enabled"
+    private const val KEY_VISION_BASE_URL = "qai_vision_base_url"
+    private const val KEY_VISION_API_KEY = "qai_vision_api_key"
+    private const val KEY_VISION_MODEL = "qai_vision_model"
+
+    const val DEFAULT_COMPRESS_THRESHOLD = 4000
+    const val MIN_COMPRESS_THRESHOLD = 500
+    const val MAX_COMPRESS_THRESHOLD = 30000
+
+    const val DEFAULT_COMPRESS_KEEP_TURNS = 5
+    const val MIN_COMPRESS_KEEP_TURNS = 1
+    const val MAX_COMPRESS_KEEP_TURNS = 20
 
     const val REASONING_OFF = 0
     const val REASONING_LOW = 1
@@ -47,7 +67,7 @@ object LlmConfig {
         Role(
             id = "assistant",
             name = "默认助手",
-            prompt = "你是一个QQ聊天智能辅助助手，请用简练友好的语言回答。适合直接作为聊天回复。",
+            prompt = "你是一个QQ聊天智能辅助助手，请始终以我的立场代入，根据聊天背景与对方发言，直接输出纯台词聊天回复。",
             isBuiltIn = true
         )
     )
@@ -109,12 +129,24 @@ object LlmConfig {
         getPrefs(context).edit().putString(keyName, key.trim()).apply()
     }
 
+    /**
+     * 获取指定服务商预设下当前配置或默认的大语言模型名称。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *     preset (Int): 服务商预设枚举常量（参见 PresetRegistry）。
+     *
+     * Returns:
+     *     String: 配置的模型名称字符串，若未显式配置则回退到该预设官方默认模型。
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.loadData`
+     *     - `AiReplyBottomSheetDialog.kt:AiReplyBottomSheetDialog.startAiRequest`
+     *     - `LlmConfig.kt:LlmConfig.getEffectiveVisionModel`
+     */
     fun getModel(context: Context, preset: Int): String {
         val keyName = "qai_model_$preset"
         val saved = getPrefs(context).getString(keyName, "")?.trim() ?: ""
-        if (saved == "gpt-4o-mini" && preset == PresetRegistry.CUSTOM) {
-            return ""
-        }
         return if (saved.isNotBlank()) saved else PresetRegistry.getDefaultModel(preset)
     }
 
@@ -559,5 +591,337 @@ object LlmConfig {
             .map { it.trim() }
             .filter { it.isNotEmpty() }
         return if (parts.isNotEmpty()) parts else listOf(trimmed)
+    }
+
+    /**
+     * 获取是否启用会话记忆持久化存储。
+     *
+     * 启用后每次对话生成的回复将自动记录在本地数据库中，实现跨次长程记忆。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *
+     * Returns:
+     *     Boolean: true 为启用会话记忆，false 为禁用。
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.loadData`
+     *     - `AiReplyBottomSheetDialog.kt:AiReplyBottomSheetDialog.buildDialogView`
+     *     - `AiReplyBottomSheetDialog.kt:AiReplyBottomSheetDialog.startAiRequest`
+     */
+    fun isSessionMemoryEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_SESSION_MEMORY_ENABLED, false)
+    }
+
+    /**
+     * 设置是否启用会话记忆持久化存储。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *     enabled (Boolean): 是否开启。
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.bindViews`
+     */
+    fun setSessionMemoryEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_SESSION_MEMORY_ENABLED, enabled).apply()
+    }
+
+    /**
+     * 获取是否启用上下文自动压缩功能。
+     *
+     * 当历史记忆长度达到阈值时自动通过大模型提炼核心事实并浓缩旧记录。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *
+     * Returns:
+     *     Boolean: true 为启用智能压缩，false 为禁用。
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.loadData`
+     *     - `ContextCompressor.kt:ContextCompressor.triggerCompressionIfNeeded`
+     */
+    fun isContextCompressEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_CONTEXT_COMPRESS_ENABLED, false)
+    }
+
+    /**
+     * 设置是否启用上下文自动压缩功能。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *     enabled (Boolean): 是否开启。
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.bindViews`
+     */
+    fun setContextCompressEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_CONTEXT_COMPRESS_ENABLED, enabled).apply()
+    }
+
+    /**
+     * 获取触发上下文压缩的字符长度阈值。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *
+     * Returns:
+     *     Int: 字符长度阈值（介于 500 至 30000 之间，默认 4000）。
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.loadData`
+     *     - `ContextCompressor.kt:ContextCompressor.triggerCompressionIfNeeded`
+     */
+    fun getContextCompressThreshold(context: Context): Int {
+        val t = getPrefs(context).getInt(KEY_CONTEXT_COMPRESS_THRESHOLD, DEFAULT_COMPRESS_THRESHOLD)
+        return t.coerceIn(MIN_COMPRESS_THRESHOLD, MAX_COMPRESS_THRESHOLD)
+    }
+
+    /**
+     * 设置触发上下文压缩的字符长度阈值。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *     threshold (Int): 目标字符长度阈值。
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.bindViews`
+     */
+    fun setContextCompressThreshold(context: Context, threshold: Int) {
+        val safe = threshold.coerceIn(MIN_COMPRESS_THRESHOLD, MAX_COMPRESS_THRESHOLD)
+        getPrefs(context).edit().putInt(KEY_CONTEXT_COMPRESS_THRESHOLD, safe).apply()
+    }
+
+    /**
+     * 获取上下文压缩时保留的最新未压缩轮数。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *
+     * Returns:
+     *     Int: 保留的最新轮数（介于 1 至 20 之间，默认 5 轮）。
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.loadData`
+     *     - `ContextCompressor.kt:ContextCompressor.triggerCompressionIfNeeded`
+     */
+    fun getContextCompressKeepTurns(context: Context): Int {
+        val turns = getPrefs(context).getInt(KEY_CONTEXT_COMPRESS_KEEP_TURNS, DEFAULT_COMPRESS_KEEP_TURNS)
+        return turns.coerceIn(MIN_COMPRESS_KEEP_TURNS, MAX_COMPRESS_KEEP_TURNS)
+    }
+
+    /**
+     * 设置上下文压缩时保留的最新未压缩轮数。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *     turns (Int): 保留的最新轮数。
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.bindViews`
+     */
+    fun setContextCompressKeepTurns(context: Context, turns: Int) {
+        val safe = turns.coerceIn(MIN_COMPRESS_KEEP_TURNS, MAX_COMPRESS_KEEP_TURNS)
+        getPrefs(context).edit().putInt(KEY_CONTEXT_COMPRESS_KEEP_TURNS, safe).apply()
+    }
+
+    /**
+     * 判断是否启用了独立图片理解（Image Captioning）辅助服务。
+     *
+     * 专为使用非多模态大模型（如纯文本模型）的用户提供图片描述提取，
+     * 当主模型本身具备多模态能力时亦可关闭此开关，直接将原图传入主模型。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *
+     * Returns:
+     *     Boolean: true 为启用独立图片理解服务，false 为关闭。
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.loadData`
+     *     - `AiReplyBottomSheetDialog.kt:AiReplyBottomSheetDialog.startAiRequest`
+     *     - `AioMenuHook.kt:AioMenuHook.extractMessagePayload`
+     */
+    fun isVisionCaptionEnabled(context: Context): Boolean {
+        return getPrefs(context).getBoolean(KEY_VISION_CAPTION_ENABLED, false)
+    }
+
+    /**
+     * 设置是否启用独立图片理解辅助服务。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *     enabled (Boolean): 是否开启独立图片理解。
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.bindViews`
+     */
+    fun setVisionCaptionEnabled(context: Context, enabled: Boolean) {
+        getPrefs(context).edit().putBoolean(KEY_VISION_CAPTION_ENABLED, enabled).apply()
+    }
+
+    /**
+     * 获取配置的独立图片理解 API 基础地址。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *
+     * Returns:
+     *     String: 图片理解服务 Base URL（若未设置则返回空字符串）。
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.loadData`
+     *     - `VisionCaptionService.kt:VisionCaptionService.requestCaption`
+     */
+    fun getVisionBaseUrl(context: Context): String {
+        return getPrefs(context).getString(KEY_VISION_BASE_URL, "") ?: ""
+    }
+
+    /**
+     * 设置独立图片理解 API 基础地址。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *     url (String): 目标接口地址。
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.showVisionBaseUrlDialog`
+     */
+    fun setVisionBaseUrl(context: Context, url: String) {
+        val normalized = UrlNormalizer.normalizeBaseUrl(url)
+        getPrefs(context).edit().putString(KEY_VISION_BASE_URL, normalized).apply()
+    }
+
+    /**
+     * 获取配置的独立图片理解 API 密钥。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *
+     * Returns:
+     *     String: 图片理解服务密钥字符串。
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.loadData`
+     *     - `VisionCaptionService.kt:VisionCaptionService.requestCaption`
+     */
+    fun getVisionApiKey(context: Context): String {
+        return getPrefs(context).getString(KEY_VISION_API_KEY, "")?.trim() ?: ""
+    }
+
+    /**
+     * 设置独立图片理解 API 密钥。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *     apiKey (String): 目标 API 密钥。
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.showVisionApiKeyDialog`
+     */
+    fun setVisionApiKey(context: Context, apiKey: String) {
+        getPrefs(context).edit().putString(KEY_VISION_API_KEY, apiKey.trim()).apply()
+    }
+
+    /**
+     * 获取用户显式配置的独立图片理解模型名称。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *
+     * Returns:
+     *     String: 用户显式保存的模型标识符，若未自定义则返回空字符串。
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.loadData`
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.showVisionModelDialog`
+     *     - `LlmConfig.kt:LlmConfig.getEffectiveVisionModel`
+     */
+    fun getVisionModel(context: Context): String {
+        return getPrefs(context).getString(KEY_VISION_MODEL, "")?.trim() ?: ""
+    }
+
+    /**
+     * 获取当前生效的独立图片理解模型名称。
+     *
+     * 若用户显式配置了专用视觉模型则优先使用；若留空，则自动继承当前主模型配置的模型标识。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *
+     * Returns:
+     *     String: 当前生效的多模态模型名称。
+     *
+     * Callers:
+     *     - `LlmConfig.kt:LlmConfig.isVisionCaptionReady`
+     *     - `VisionCaptionService.kt:VisionCaptionService.getCaptionsForImages`
+     */
+    fun getEffectiveVisionModel(context: Context): String {
+        val custom = getVisionModel(context)
+        if (custom.isNotBlank()) return custom
+        val preset = getSelectedPreset(context)
+        return getModel(context, preset)
+    }
+
+    /**
+     * 设置独立图片理解模型名称。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *     model (String): 目标模型标识，允许传入空字符串以表示继承主模型。
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity.kt:AiSettingsActivity.showVisionModelDialog`
+     */
+    fun setVisionModel(context: Context, model: String) {
+        getPrefs(context).edit().putString(KEY_VISION_MODEL, model.trim()).apply()
+    }
+
+    /**
+     * 判断独立图片理解服务是否具备完整且可用的调用配置。
+     *
+     * 当开关启用且已具备有效的 Base URL、API Key 与生效模型名称时返回 true。
+     *
+     * Args:
+     *     context (Context): Android 上下文对象。
+     *
+     * Returns:
+     *     Boolean: 若可用返回 true，否则返回 false。
+     *
+     * Callers:
+     *     - `AiReplyBottomSheetDialog.kt:AiReplyBottomSheetDialog.startAiRequest`
+     *     - `AioMenuHook.kt:AioMenuHook.extractMessagePayload`
+     */
+    fun isVisionCaptionReady(context: Context): Boolean {
+        if (!isVisionCaptionEnabled(context)) return false
+        val baseUrl = getVisionBaseUrl(context)
+        val apiKey = getVisionApiKey(context)
+        val model = getEffectiveVisionModel(context)
+        return isValidBaseUrl(baseUrl) && apiKey.isNotBlank() && model.isNotBlank()
     }
 }

@@ -48,6 +48,7 @@ object AioInputHelper {
      *     contact (Any): 目标会话 Contact 实例。
      *     text (String): 待发送的文本内容。
      *     replyMsgItem (Any?): 可选的被引用消息项（AIOMsgItem）。
+     *     targetSenderNick (String?): 可选的目标成员展示昵称。
      *
      * Returns:
      *     Boolean: true 表示成功向底层服务提交发送请求，false 表示提交失败。
@@ -59,7 +60,8 @@ object AioInputHelper {
         context: Context,
         contact: Any,
         text: String,
-        replyMsgItem: Any? = null
+        replyMsgItem: Any? = null,
+        targetSenderNick: String? = null
     ): Boolean {
         try {
             val classLoader = context.classLoader
@@ -73,7 +75,11 @@ object AioInputHelper {
             val textElementClass = classLoader.loadClass("com.tencent.qqnt.kernel.nativeinterface.TextElement")
             val elementsList = ArrayList<Any>()
 
-            // 1. 若提供了被引用消息项，则构造 ReplyElement 并作为首个元素插入
+            var targetUid = ""
+            var targetUin = 0L
+            var effectiveTargetNick = targetSenderNick
+
+            // 1. 若提供了被引用消息项，提取目标成员信息并构造 ReplyElement 插入首位
             if (replyMsgItem != null) {
                 val replyRecord = AioMenuHook.extractMsgRecord(replyMsgItem)
                 if (replyRecord != null) {
@@ -83,7 +89,15 @@ object AioInputHelper {
                     val msgId = (getFieldValue(replyRecord, "msgId") as? Long) ?: 0L
                     val msgSeq = (getFieldValue(replyRecord, "msgSeq") as? Long) ?: 0L
                     val senderUid = (getFieldValue(replyRecord, "senderUid") as? String) ?: ""
+                    val senderUin = (getFieldValue(replyRecord, "senderUin") as? Long)
+                        ?: (getFieldValue(replyRecord, "senderUin")?.toString()?.toLongOrNull() ?: 0L)
                     val sourceSummary = AioMenuHook.extractSingleMessageText(replyMsgItem)
+
+                    targetUid = senderUid
+                    targetUin = senderUin
+                    if (effectiveTargetNick.isNullOrBlank()) {
+                        effectiveTargetNick = AioMenuHook.extractSenderName(replyMsgItem, replyRecord)
+                    }
 
                     setFieldValue(replyElem, "replayMsgId", msgId)
                     setFieldValue(replyElem, "replayMsgSeq", msgSeq)
@@ -98,14 +112,52 @@ object AioInputHelper {
                 }
             }
 
-            // 2. 构造文本内容 TextElement
-            val textElem = textElementClass.getConstructor().newInstance()
-            setFieldValue(textElem, "content", text)
+            // 2. 切片解析文本中的 @ 成员标记
+            val segments = QQRichTextParser.parseRichText(
+                rawText = text,
+                targetUid = targetUid.takeIf { it.isNotEmpty() },
+                targetUin = targetUin.takeIf { it > 0L },
+                targetNick = effectiveTargetNick
+            )
 
-            val textMsgElement = msgElementClass.getConstructor().newInstance()
-            setFieldValue(textMsgElement, "elementType", 1)
-            setFieldValue(textMsgElement, "textElement", textElem)
-            elementsList.add(textMsgElement)
+            if (segments.isEmpty() && text.isNotEmpty()) {
+                val textElem = textElementClass.getConstructor().newInstance()
+                setFieldValue(textElem, "content", text)
+                val textMsgElement = msgElementClass.getConstructor().newInstance()
+                setFieldValue(textMsgElement, "elementType", 1)
+                setFieldValue(textMsgElement, "textElement", textElem)
+                elementsList.add(textMsgElement)
+            } else {
+                for (seg in segments) {
+                    when (seg) {
+                        is QQRichTextParser.RichSegment.Text -> {
+                            val textElem = textElementClass.getConstructor().newInstance()
+                            setFieldValue(textElem, "content", seg.text)
+                            val textMsgElement = msgElementClass.getConstructor().newInstance()
+                            setFieldValue(textMsgElement, "elementType", 1)
+                            setFieldValue(textMsgElement, "textElement", textElem)
+                            elementsList.add(textMsgElement)
+                        }
+                        is QQRichTextParser.RichSegment.At -> {
+                            val atElem = textElementClass.getConstructor().newInstance()
+                            setFieldValue(atElem, "content", seg.displayContent)
+                            setFieldValue(atElem, "atType", seg.atType)
+                            if (seg.uid.isNotEmpty()) {
+                                setFieldValue(atElem, "atNtUid", seg.uid)
+                                setFieldValue(atElem, "atUid", seg.uid)
+                            }
+                            if (seg.uin > 0L) {
+                                setFieldValue(atElem, "atTinyId", seg.uin)
+                            }
+
+                            val atMsgElement = msgElementClass.getConstructor().newInstance()
+                            setFieldValue(atMsgElement, "elementType", 1)
+                            setFieldValue(atMsgElement, "textElement", atElem)
+                            elementsList.add(atMsgElement)
+                        }
+                    }
+                }
+            }
 
             // 3. 计算唯一消息 ID 并分发给底层服务
             val chatType = (getFieldValue(contact, "chatType") as? Int) ?: 1
@@ -119,7 +171,7 @@ object AioInputHelper {
             }
             if (sendMsgMethod != null) {
                 sendMsgMethod.invoke(msgService, uniqueId, contact, elementsList, HashMap<Int, Any>(), null)
-                android.util.Log.i("QAI_DirectSend", "sendDirectMessage via sendMsg succeeded, uniqueId=$uniqueId")
+                android.util.Log.i("QAI_DirectSend", "sendDirectMessage via sendMsg succeeded, uniqueId=$uniqueId, elements=${elementsList.size}")
                 return true
             }
 
@@ -128,14 +180,14 @@ object AioInputHelper {
             }
             if (addSendMsgMethod != null) {
                 addSendMsgMethod.invoke(msgService, uniqueId, contact, elementsList, HashMap<Int, Any>())
-                android.util.Log.i("QAI_DirectSend", "sendDirectMessage via addSendMsg succeeded, uniqueId=$uniqueId")
+                android.util.Log.i("QAI_DirectSend", "sendDirectMessage via addSendMsg succeeded, uniqueId=$uniqueId, elements=${elementsList.size}")
                 return true
             }
 
             android.util.Log.e("QAI_DirectSend", "Neither sendMsg nor addSendMsg method was found on IKernelMsgService")
             return false
         } catch (e: Throwable) {
-            android.util.Log.e("QAI_DirectSend", "sendDirectMessage execution failed", e)
+            android.util.Log.e("QAI_DirectSend", "sendDirectMessage execution failed: ${e.message}", e)
             return false
         }
     }
@@ -243,9 +295,11 @@ object AioInputHelper {
      * 将指定文本填入聊天输入框
      *
      * 遍历当前顶层 Activity 的视图树寻找显示的输入框，并将文本追加或填入其中。
+     * 自动将特殊协议标记（如 CQ 码）标准化为自然的表情中文字符与 @ 文本。
      *
      * Args:
      *     text (String): 待填入的文本内容。
+     *     targetNick (String?): 目标成员展示昵称（可选）。
      *
      * Returns:
      *     Boolean: true 表示成功定位并填入输入框，false 表示未能找到输入框。
@@ -253,14 +307,15 @@ object AioInputHelper {
      * Callers:
      *     - `AiReplyBottomSheetDialog:btnInsert.setOnClickListener`
      */
-    fun insertTextToInput(text: String): Boolean {
+    fun insertTextToInput(text: String, targetNick: String? = null): Boolean {
         val activity = getCurrentActivity() ?: return false
         val decor = activity.window?.decorView ?: return false
         val editText = findChatEditText(decor) ?: return false
 
+        val normalized = QQRichTextParser.normalizeForInputBox(text, targetNick)
         editText.post {
             val origin = editText.text?.toString() ?: ""
-            editText.setText(if (origin.isEmpty()) text else "$origin $text")
+            editText.setText(if (origin.isEmpty()) normalized else "$origin $normalized")
             editText.setSelection(editText.text?.length ?: 0)
             editText.requestFocus()
         }
@@ -271,11 +326,13 @@ object AioInputHelper {
      * 发送文本到当前聊天窗口
      *
      * 支持可选的引用原消息动作；将生成的文本填入聊天输入框并触发界面发送按钮或输入法发送动作。
+     * 自动将特殊协议标记（如 CQ 码）标准化为自然的表情中文字符与 @ 文本。
      *
      * Args:
      *     activity (Activity): 承载聊天界面的 Activity。
      *     text (String): 待发送的文本内容。
      *     quoteAction (() -> Unit)?: 可选的引用动作，在填入文本前触发 QQ 原生引用模式。
+     *     targetNick (String?): 目标成员展示昵称（可选）。
      *
      * Returns:
      *     Boolean: true 表示操作已提交执行，false 表示未定位到当前窗口。
@@ -283,8 +340,14 @@ object AioInputHelper {
      * Callers:
      *     - `AiReplyBottomSheetDialog:btnSend.setOnClickListener`
      */
-    fun sendText(activity: Activity, text: String, quoteAction: (() -> Unit)? = null): Boolean {
+    fun sendText(
+        activity: Activity,
+        text: String,
+        quoteAction: (() -> Unit)? = null,
+        targetNick: String? = null
+    ): Boolean {
         val decor = activity.window?.decorView ?: return false
+        val normalized = QQRichTextParser.normalizeForInputBox(text, targetNick)
 
         activity.runOnUiThread {
             if (quoteAction != null) {
@@ -295,8 +358,8 @@ object AioInputHelper {
                 decor.postDelayed({
                     val editText = findChatEditText(decor)
                     if (editText != null) {
-                        editText.setText(text)
-                        editText.setSelection(text.length)
+                        editText.setText(normalized)
+                        editText.setSelection(normalized.length)
                         editText.requestFocus()
 
                         editText.postDelayed({
@@ -311,8 +374,8 @@ object AioInputHelper {
                 // 无引用动作，直接填入输入框并触发发送
                 val editText = findChatEditText(decor)
                 if (editText != null) {
-                    editText.setText(text)
-                    editText.setSelection(text.length)
+                    editText.setText(normalized)
+                    editText.setSelection(normalized.length)
                     editText.requestFocus()
 
                     editText.postDelayed({

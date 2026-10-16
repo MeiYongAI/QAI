@@ -31,6 +31,9 @@ import android.widget.TextView
 import android.widget.Toast
 import io.github.meiyongai.qai.R
 import io.github.meiyongai.qai.llm.config.LlmConfig
+import io.github.meiyongai.qai.llm.memory.SessionMemory
+import io.github.meiyongai.qai.llm.memory.SessionMemoryManager
+import io.github.meiyongai.qai.llm.memory.SessionMemorySummaryItem
 import io.github.meiyongai.qai.llm.model.Role
 import io.github.meiyongai.qai.llm.net.OpenAICompatClient
 import io.github.meiyongai.qai.llm.preset.PresetRegistry
@@ -79,6 +82,18 @@ class AiSettingsActivity : Activity() {
     // 发送板块
     private lateinit var switchQuoteOnSend: Switch
     private lateinit var switchMultiChoice: Switch
+
+    // 记忆与压缩板块
+    private lateinit var switchSessionMemory: Switch
+    private lateinit var switchContextCompress: Switch
+    private lateinit var tvCompressThresholdValue: TextView
+    private lateinit var tvCompressKeepTurnsValue: TextView
+
+    // 视觉理解（图片反推模型）板块
+    private lateinit var switchVisionCaption: Switch
+    private lateinit var tvVisionBaseUrlValue: TextView
+    private lateinit var tvVisionApiKeyValue: TextView
+    private lateinit var tvVisionModelValue: TextView
 
     override fun attachBaseContext(newBase: Context) {
         val modCtx = try {
@@ -311,6 +326,8 @@ class AiSettingsActivity : Activity() {
         rootView.findViewById<TextView>(R.id.tvGroup2Title).setTextColor(colorTextSecondary)
         rootView.findViewById<TextView>(R.id.tvGroupContextTitle)?.setTextColor(colorTextSecondary)
         rootView.findViewById<TextView>(R.id.tvGroup3Title).setTextColor(colorTextSecondary)
+        rootView.findViewById<TextView>(R.id.tvGroup4Title)?.setTextColor(colorTextSecondary)
+        rootView.findViewById<TextView>(R.id.tvGroupVisionTitle)?.setTextColor(colorTextSecondary)
 
         // 卡片背景动态纯正着色 (标准 10dp 圆角)
         fun createCardDrawable(): GradientDrawable {
@@ -324,13 +341,17 @@ class AiSettingsActivity : Activity() {
         rootView.findViewById<View>(R.id.cardParams).background = createCardDrawable()
         rootView.findViewById<View>(R.id.cardContext)?.background = createCardDrawable()
         rootView.findViewById<View>(R.id.cardSend).background = createCardDrawable()
+        rootView.findViewById<View>(R.id.cardMemory)?.background = createCardDrawable()
+        rootView.findViewById<View>(R.id.cardVision)?.background = createCardDrawable()
 
         // 分割线着色
         val dividers = listOf(
             R.id.div1, R.id.div2, R.id.div3, R.id.div4, R.id.div5,
             R.id.divRoleTemp,
             R.id.divContext1, R.id.divContext2, R.id.divContext3, R.id.divContext4,
-            R.id.divSend1
+            R.id.divSend1,
+            R.id.divMemory1, R.id.divMemory2, R.id.divMemory3, R.id.divMemory4,
+            R.id.divVision1, R.id.divVision2, R.id.divVision3
         )
         dividers.forEach { id ->
             rootView.findViewById<View>(id)?.setBackgroundColor(colorDivider)
@@ -342,18 +363,26 @@ class AiSettingsActivity : Activity() {
             R.id.tvReasoningLabel, R.id.tvRoleLabel, R.id.tvTempLabel,
             R.id.tvContextCountLabel, R.id.tvExcludeImageLabel, R.id.tvExcludeEmojiLabel,
             R.id.tvExcludeCardLabel, R.id.tvExcludeVoiceLabel,
-            R.id.tvQuoteOnSendLabel, R.id.tvMultiChoiceLabel
+            R.id.tvQuoteOnSendLabel, R.id.tvMultiChoiceLabel,
+            R.id.tvSessionMemoryLabel, R.id.tvContextCompressLabel,
+            R.id.tvCompressThresholdLabel, R.id.tvCompressKeepTurnsLabel,
+            R.id.tvManageSessionsLabel,
+            R.id.tvVisionCaptionLabel, R.id.tvVisionBaseUrlLabel, R.id.tvVisionApiKeyLabel, R.id.tvVisionModelLabel
         )
         labels.forEach { id ->
             rootView.findViewById<TextView>(id)?.setTextColor(colorTextPrimary)
         }
         rootView.findViewById<TextView>(R.id.tvMultiChoiceDesc)?.setTextColor(colorTextSecondary)
+        rootView.findViewById<TextView>(R.id.tvSessionMemoryDesc)?.setTextColor(colorTextSecondary)
+        rootView.findViewById<TextView>(R.id.tvContextCompressDesc)?.setTextColor(colorTextSecondary)
+        rootView.findViewById<TextView>(R.id.tvVisionCaptionDesc)?.setTextColor(colorTextSecondary)
 
         // 列表项向右箭头图标着色 (QUI 原生 tertiary 灰色阶)
         val arrows = listOf(
             R.id.ivProviderArrow, R.id.ivBaseUrlArrow, R.id.ivApiKeyArrow,
             R.id.ivModelArrow, R.id.ivReasoningArrow, R.id.ivTestArrow,
-            R.id.ivRoleArrow
+            R.id.ivRoleArrow, R.id.ivManageSessionsChevron,
+            R.id.ivVisionBaseUrlArrow, R.id.ivVisionApiKeyArrow, R.id.ivVisionModelArrow
         )
         arrows.forEach { id ->
             rootView.findViewById<ImageView>(id)?.setColorFilter(colorArrow)
@@ -368,6 +397,11 @@ class AiSettingsActivity : Activity() {
         tvRoleValue.setTextColor(colorTextSecondary)
         tvTempValue.setTextColor(colorTextSecondary)
         tvContextCountValue.setTextColor(colorTextSecondary)
+        tvCompressThresholdValue.setTextColor(colorTextSecondary)
+        tvCompressKeepTurnsValue.setTextColor(colorTextSecondary)
+        tvVisionBaseUrlValue.setTextColor(colorTextSecondary)
+        tvVisionApiKeyValue.setTextColor(colorTextSecondary)
+        tvVisionModelValue.setTextColor(colorTextSecondary)
 
         // 测试链接文字
         rootView.findViewById<TextView>(R.id.tvTestLabel)?.setTextColor(colorTextPrimary)
@@ -394,7 +428,8 @@ class AiSettingsActivity : Activity() {
 
         listOf(
             switchExcludeImage, switchExcludeEmoji, switchExcludeCard,
-            switchExcludeVoice, switchQuoteOnSend, switchMultiChoice
+            switchExcludeVoice, switchQuoteOnSend, switchMultiChoice,
+            switchSessionMemory, switchContextCompress, switchVisionCaption
         ).forEach { sw ->
             sw.trackTintList = null
             sw.trackDrawable = createSwitchTrackDrawable()
@@ -423,7 +458,8 @@ class AiSettingsActivity : Activity() {
      * 绑定界面所有视图组件及其交互事件
      *
      * 包括顶栏返回、服务商选择、接口地址、密钥、模型、推理等级、温度 SeekBar、
-     * 角色选择、上下文条数 SeekBar、各项消息排除 Switch 开关及引用发送开关。
+     * 角色选择、上下文条数调节与精准输入、各项消息排除 Switch 开关、引用发送开关、
+     * 会话长期记忆开关、智能上下文压缩开关、压缩参数配置及记忆数据管理。
      *
      * Args:
      *     root (View): 设置页面的根视图。
@@ -478,7 +514,7 @@ class AiSettingsActivity : Activity() {
             }
         })
 
-        // 上下文条数 SeekBar 调节（0-100 条，0 为关闭）
+        // 上下文条数 SeekBar 调节（0-1000 条，0 为关闭）
         sbContextCount.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 tvContextCountValue.text = if (progress == 0) "已关闭" else "$progress 条"
@@ -492,6 +528,14 @@ class AiSettingsActivity : Activity() {
                 LlmConfig.setContextCount(this@AiSettingsActivity, progress)
             }
         })
+
+        // 支持点击上下文标签或条数值直接输入精准数值（0~1000）
+        tvContextCountValue.setOnClickListener {
+            showContextCountInputDialog()
+        }
+        root.findViewById<View>(R.id.tvContextCountLabel)?.setOnClickListener {
+            showContextCountInputDialog()
+        }
 
         // 排除项开关事件绑定
         switchExcludeImage.setOnCheckedChangeListener { _, isChecked ->
@@ -574,13 +618,68 @@ class AiSettingsActivity : Activity() {
         root.findViewById<View>(R.id.itemMultiChoice).setOnClickListener {
             switchMultiChoice.toggle()
         }
+
+        // 记忆与压缩组件绑定
+        switchSessionMemory = root.findViewById(R.id.switchSessionMemory)
+        switchSessionMemory.setOnCheckedChangeListener { _, isChecked ->
+            LlmConfig.setSessionMemoryEnabled(this, isChecked)
+        }
+        root.findViewById<View>(R.id.itemSessionMemory).setOnClickListener {
+            switchSessionMemory.toggle()
+        }
+
+        switchContextCompress = root.findViewById(R.id.switchContextCompress)
+        switchContextCompress.setOnCheckedChangeListener { _, isChecked ->
+            LlmConfig.setContextCompressEnabled(this, isChecked)
+        }
+        root.findViewById<View>(R.id.itemContextCompress).setOnClickListener {
+            switchContextCompress.toggle()
+        }
+
+        tvCompressThresholdValue = root.findViewById(R.id.tvCompressThresholdValue)
+        root.findViewById<View>(R.id.itemCompressThreshold).setOnClickListener {
+            showCompressThresholdPicker()
+        }
+
+        tvCompressKeepTurnsValue = root.findViewById(R.id.tvCompressKeepTurnsValue)
+        root.findViewById<View>(R.id.itemCompressKeepTurns).setOnClickListener {
+            showCompressKeepTurnsPicker()
+        }
+
+        root.findViewById<View>(R.id.itemManageSessions).setOnClickListener {
+            showSessionManagerDialog()
+        }
+
+        // 视觉理解（图片反推模型）组件绑定
+        switchVisionCaption = root.findViewById(R.id.switchVisionCaption)
+        switchVisionCaption.setOnCheckedChangeListener { _, isChecked ->
+            LlmConfig.setVisionCaptionEnabled(this, isChecked)
+        }
+        root.findViewById<View>(R.id.itemVisionCaption).setOnClickListener {
+            switchVisionCaption.toggle()
+        }
+
+        tvVisionBaseUrlValue = root.findViewById(R.id.tvVisionBaseUrlValue)
+        root.findViewById<View>(R.id.itemVisionBaseUrl).setOnClickListener {
+            showVisionBaseUrlDialog()
+        }
+
+        tvVisionApiKeyValue = root.findViewById(R.id.tvVisionApiKeyValue)
+        root.findViewById<View>(R.id.itemVisionApiKey).setOnClickListener {
+            showVisionApiKeyDialog()
+        }
+
+        tvVisionModelValue = root.findViewById(R.id.tvVisionModelValue)
+        root.findViewById<View>(R.id.itemVisionModel).setOnClickListener {
+            showVisionModelDialog()
+        }
     }
 
     /**
      * 从配置存储中加载并刷新当前页面展示的数据
      *
      * 读取当前生效的服务商、地址、脱敏密钥、模型名称、推理参数、当前角色、温度、
-     * 上下文消息条数、各项排除标志以及引用发送开关状态。
+     * 上下文消息条数、各项排除标志、引用发送开关状态，以及会话长期记忆与压缩参数。
      *
      * Args:
      *     无
@@ -629,6 +728,21 @@ class AiSettingsActivity : Activity() {
 
         switchQuoteOnSend.isChecked = LlmConfig.isQuoteOnSend(this)
         switchMultiChoice.isChecked = LlmConfig.isMultiChoiceEnabled(this)
+
+        switchSessionMemory.isChecked = LlmConfig.isSessionMemoryEnabled(this)
+        switchContextCompress.isChecked = LlmConfig.isContextCompressEnabled(this)
+        val threshold = LlmConfig.getContextCompressThreshold(this)
+        tvCompressThresholdValue.text = "$threshold 字符"
+        val keepTurns = LlmConfig.getContextCompressKeepTurns(this)
+        tvCompressKeepTurnsValue.text = "$keepTurns 轮"
+
+        switchVisionCaption.isChecked = LlmConfig.isVisionCaptionEnabled(this)
+        val vBaseUrl = LlmConfig.getVisionBaseUrl(this)
+        tvVisionBaseUrlValue.text = if (vBaseUrl.isBlank()) "继承主接口地址" else vBaseUrl
+        val vApiKey = LlmConfig.getVisionApiKey(this)
+        tvVisionApiKeyValue.text = if (vApiKey.isBlank()) "继承主接口密钥" else maskApiKey(vApiKey)
+        val vModel = LlmConfig.getVisionModel(this)
+        tvVisionModelValue.text = if (vModel.isBlank()) "继承主接口模型" else vModel
     }
 
     private fun getReasoningTitle(effort: Int): String {
@@ -761,6 +875,138 @@ class AiSettingsActivity : Activity() {
                 val newKey = input.text.toString().trim()
                 LlmConfig.setApiKey(this, currentPreset, newKey)
                 tvApiKeyValue.text = if (newKey.isBlank()) "未配置" else maskApiKey(newKey)
+            }
+            .setNegativeButton("取消", null)
+            .create()
+
+        showAndStylizeDialog(dialog)
+    }
+
+    /**
+     * 弹出设置视觉理解（图片反推模型）自定义 Base URL 的对话框
+     *
+     * 允许用户指定专用的多模态视觉 API 服务地址（如中转地址、本地 Ollama 或自建 vLLM），
+     * 留空时系统将默认继承主模型当前生效的服务地址。
+     *
+     * Args:
+     *     无
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity:bindViews`
+     */
+    private fun showVisionBaseUrlDialog() {
+        val isNight = isNightMode()
+        val currentUrl = LlmConfig.getVisionBaseUrl(this)
+        val input = EditText(this).apply {
+            hint = "留空则继承主接口地址"
+            setText(currentUrl)
+            setSelection(text.length)
+            inputType = InputType.TYPE_TEXT_VARIATION_URI or InputType.TYPE_CLASS_TEXT
+            setTextColor(if (isNight) Color.parseColor("#EBEBF5") else Color.parseColor("#1F1F1F"))
+            setHintTextColor(if (isNight) Color.parseColor("#636366") else Color.parseColor("#BCBCC0"))
+            setPadding(48, 36, 48, 36)
+        }
+
+        val dialog = createThemedDialogBuilder()
+            .setTitle("视觉接口地址")
+            .setMessage("指定独立的视觉接口地址。若留空，则自动继承主接口地址。")
+            .setView(input)
+            .setPositiveButton("确定") { _, _ ->
+                val newUrl = input.text.toString().trim()
+                LlmConfig.setVisionBaseUrl(this, newUrl)
+                tvVisionBaseUrlValue.text = if (newUrl.isBlank()) "继承主接口地址" else newUrl
+            }
+            .setNegativeButton("取消", null)
+            .create()
+
+        showAndStylizeDialog(dialog)
+    }
+
+    /**
+     * 弹出设置视觉理解专用 API 密钥的对话框
+     *
+     * 允许用户为专用图片反推接口配置独立的身份验证 Token，
+     * 留空时系统将默认继承主模型当前配置的 API 密钥。
+     *
+     * Args:
+     *     无
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity:bindViews`
+     */
+    private fun showVisionApiKeyDialog() {
+        val isNight = isNightMode()
+        val currentKey = LlmConfig.getVisionApiKey(this)
+        val input = EditText(this).apply {
+            hint = "留空则继承主接口密钥"
+            setText(currentKey)
+            setSelection(text.length)
+            inputType = InputType.TYPE_CLASS_TEXT
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO
+            }
+            setTextColor(if (isNight) Color.parseColor("#EBEBF5") else Color.parseColor("#1F1F1F"))
+            setHintTextColor(if (isNight) Color.parseColor("#636366") else Color.parseColor("#BCBCC0"))
+            setPadding(48, 36, 48, 36)
+        }
+
+        val dialog = createThemedDialogBuilder()
+            .setTitle("视觉 API 密钥")
+            .setMessage("指定独立的视觉 API 密钥。若留空，则自动继承主接口密钥。")
+            .setView(input)
+            .setPositiveButton("确定") { _, _ ->
+                val newKey = input.text.toString().trim()
+                LlmConfig.setVisionApiKey(this, newKey)
+                tvVisionApiKeyValue.text = if (newKey.isBlank()) "继承主接口密钥" else maskApiKey(newKey)
+            }
+            .setNegativeButton("取消", null)
+            .create()
+
+        showAndStylizeDialog(dialog)
+    }
+
+    /**
+     * 弹出设置视觉理解模型名称的对话框
+     *
+     * 允许用户为专用图片反推接口指定独立的多模态模型名称，
+     * 留空时系统将默认继承当前主模型配置的模型标识。
+     *
+     * Args:
+     *     无
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity:bindViews`
+     */
+    private fun showVisionModelDialog() {
+        val isNight = isNightMode()
+        val currentModel = LlmConfig.getVisionModel(this)
+        val input = EditText(this).apply {
+            hint = "留空则继承主接口模型"
+            setText(currentModel)
+            setSelection(text.length)
+            inputType = InputType.TYPE_CLASS_TEXT
+            setTextColor(if (isNight) Color.parseColor("#EBEBF5") else Color.parseColor("#1F1F1F"))
+            setHintTextColor(if (isNight) Color.parseColor("#636366") else Color.parseColor("#BCBCC0"))
+            setPadding(48, 36, 48, 36)
+        }
+
+        val dialog = createThemedDialogBuilder()
+            .setTitle("视觉模型")
+            .setMessage("指定独立的视觉模型。若留空，则自动继承主接口模型。")
+            .setView(input)
+            .setPositiveButton("确定") { _, _ ->
+                val newModel = input.text.toString().trim()
+                LlmConfig.setVisionModel(this, newModel)
+                tvVisionModelValue.text = if (newModel.isBlank()) "继承主接口模型" else newModel
             }
             .setNegativeButton("取消", null)
             .create()
@@ -1078,6 +1324,338 @@ class AiSettingsActivity : Activity() {
                 d.dismiss()
             })
             .setNegativeButton("取消", null)
+            .create()
+
+        showAndStylizeDialog(dialog)
+    }
+
+    /**
+     * 弹出上下文条数精确数值输入对话框
+     *
+     * 允许用户直接键盘输入 0~1000 范围内的数字，避免在 1000 档高精度滑动条上难以对齐目标数值。
+     * 输入校验通过后同步更新配置存储、界面文本展示及 SeekBar 滑动条进度。
+     *
+     * Args:
+     *     无
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity:bindViews`
+     */
+    private fun showContextCountInputDialog() {
+        val currentCount = LlmConfig.getContextCount(this)
+        val etInput = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText(currentCount.toString())
+            setSelection(text.length)
+            val isNight = isNightMode()
+            setTextColor(if (isNight) Color.parseColor("#EBEBF5") else Color.parseColor("#1A1A1A"))
+            setHintTextColor(if (isNight) Color.parseColor("#636366") else Color.parseColor("#C7C7CC"))
+            hint = "0~1000 (0为关闭)"
+        }
+
+        val container = FrameLayout(this).apply {
+            val padH = dp(20)
+            val padV = dp(12)
+            setPadding(padH, padV, padH, padV)
+            addView(etInput)
+        }
+
+        val dialog = createThemedDialogBuilder()
+            .setTitle("设置上下文条数")
+            .setMessage("请输入 0 到 1000 之间的整数（输入 0 表示完全关闭上下文附带）：")
+            .setView(container)
+            .setPositiveButton("确定") { _, _ ->
+                val text = etInput.text.toString().trim()
+                val count = text.toIntOrNull()
+                if (count == null || count !in 0..1000) {
+                    Toast.makeText(this, "请输入 0~1000 范围内的有效整数", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                LlmConfig.setContextCount(this, count)
+                sbContextCount.progress = count
+                tvContextCountValue.text = if (count == 0) "已关闭" else "$count 条"
+                Toast.makeText(this, "上下文条数已更新为 $count 条", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("取消", null)
+            .create()
+
+        showAndStylizeDialog(dialog)
+    }
+
+    /**
+     * 弹出智能上下文压缩触发阈值选择对话框
+     *
+     * 提供常见字数阈值档位（1000、2000、4000、8000、15000 字符）及自定义输入入口，
+     * 当未压缩的历史消息总字符数达到所选阈值时，自动触发异步摘要提取与历史归档。
+     *
+     * Args:
+     *     无
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity:bindViews`
+     */
+    private fun showCompressThresholdPicker() {
+        val options = arrayOf<CharSequence>(
+            "1000 字符",
+            "2000 字符",
+            "4000 字符",
+            "8000 字符",
+            "15000 字符",
+            "自定义"
+        )
+        val values = intArrayOf(1000, 2000, 4000, 8000, 15000, -1)
+        val currentThreshold = LlmConfig.getContextCompressThreshold(this)
+        val selectedIdx = values.indexOf(currentThreshold).let { if (it >= 0) it else 5 }
+
+        val dialog = createThemedDialogBuilder()
+            .setTitle("选择压缩触发阈值")
+            .setSingleChoiceItems(options, selectedIdx) { d, which ->
+                d.dismiss()
+                val targetValue = values[which]
+                if (targetValue == -1) {
+                    showCustomCompressThresholdDialog()
+                } else {
+                    LlmConfig.setContextCompressThreshold(this, targetValue)
+                    tvCompressThresholdValue.text = "$targetValue 字符"
+                }
+            }
+            .setNegativeButton("取消", null)
+            .create()
+
+        showAndStylizeDialog(dialog)
+    }
+
+    /**
+     * 弹出自定义压缩触发阈值输入对话框
+     *
+     * 允许用户输入任意 500~100000 之间的字符阈值。
+     *
+     * Args:
+     *     无
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity:showCompressThresholdPicker`
+     */
+    private fun showCustomCompressThresholdDialog() {
+        val currentVal = LlmConfig.getContextCompressThreshold(this)
+        val etInput = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            setText(currentVal.toString())
+            setSelection(text.length)
+            val isNight = isNightMode()
+            setTextColor(if (isNight) Color.parseColor("#EBEBF5") else Color.parseColor("#1A1A1A"))
+            setHintTextColor(if (isNight) Color.parseColor("#636366") else Color.parseColor("#C7C7CC"))
+            hint = "500~100000"
+        }
+
+        val container = FrameLayout(this).apply {
+            val padH = dp(20)
+            val padV = dp(12)
+            setPadding(padH, padV, padH, padV)
+            addView(etInput)
+        }
+
+        val dialog = createThemedDialogBuilder()
+            .setTitle("自定义压缩阈值")
+            .setMessage("请输入未压缩历史触发自动提炼的字符数阈值（500 ~ 100000）：")
+            .setView(container)
+            .setPositiveButton("确定") { _, _ ->
+                val v = etInput.text.toString().trim().toIntOrNull()
+                if (v == null || v !in 500..100000) {
+                    Toast.makeText(this, "请输入 500~100000 之间的有效数字", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+                LlmConfig.setContextCompressThreshold(this, v)
+                tvCompressThresholdValue.text = "$v 字符"
+            }
+            .setNegativeButton("取消", null)
+            .create()
+
+        showAndStylizeDialog(dialog)
+    }
+
+    /**
+     * 弹出压缩保留最新轮数选择对话框
+     *
+     * 选择在触发智能压缩时保留多少轮最新近的真实对白（不参与浓缩，原样呈递给大模型）。
+     *
+     * Args:
+     *     无
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity:bindViews`
+     */
+    private fun showCompressKeepTurnsPicker() {
+        val options = arrayOf<CharSequence>("2 轮", "3 轮", "5 轮", "8 轮", "10 轮", "15 轮")
+        val values = intArrayOf(2, 3, 5, 8, 10, 15)
+        val currentTurns = LlmConfig.getContextCompressKeepTurns(this)
+        val selectedIdx = values.indexOf(currentTurns).let { if (it >= 0) it else 2 }
+
+        val dialog = createThemedDialogBuilder()
+            .setTitle("选择压缩保留最新轮数")
+            .setSingleChoiceItems(options, selectedIdx) { d, which ->
+                val turns = values[which]
+                LlmConfig.setContextCompressKeepTurns(this, turns)
+                tvCompressKeepTurnsValue.text = "$turns 轮"
+                d.dismiss()
+            }
+            .setNegativeButton("取消", null)
+            .create()
+
+        showAndStylizeDialog(dialog)
+    }
+
+    /**
+     * 弹出已存储会话记忆管理对话框
+     *
+     * 从 SQLite 数据库中异步查询群聊与私聊的所有会话记忆记录，
+     * 呈现包含会话标题、类型、更新时间及记忆规模的列表，支持单条点击查看/删除与一键清空全部。
+     *
+     * Args:
+     *     无
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity:bindViews`
+     */
+    private fun showSessionManagerDialog() {
+        scope.launch {
+            val sessions = withContext(Dispatchers.IO) {
+                SessionMemoryManager.getAllSessions(this@AiSettingsActivity)
+            }
+
+            if (sessions.isEmpty()) {
+                val emptyDialog = createThemedDialogBuilder()
+                    .setTitle("会话记忆管理")
+                    .setMessage("当前数据库中暂无任何已持久化的会话记忆数据。\n当在群聊或私聊中使用 AI 生成并发送回复后，系统将自动建立并累积对应会话的记忆。")
+                    .setPositiveButton("知道了", null)
+                    .create()
+                showAndStylizeDialog(emptyDialog)
+                return@launch
+            }
+
+            val items = sessions.map { sessionItem ->
+                val typeTag = if (sessionItem.sessionType == SessionMemoryManager.SCENE_GROUP) "[群聊]" else "[私聊]"
+                val summaryInfo = if (sessionItem.summary.isBlank()) "无长期提要" else "提要: ${sessionItem.summary.length}字"
+                "$typeTag ${sessionItem.sessionTitle}\n$summaryInfo | 历史: ${sessionItem.turnCount}轮"
+            }.toTypedArray<CharSequence>()
+
+            val dialog = createThemedDialogBuilder()
+                .setTitle("会话记忆列表 (共 ${sessions.size} 个)")
+                .setItems(items) { _, which ->
+                    val chosen = sessions[which]
+                    scope.launch {
+                        val detail = withContext(Dispatchers.IO) {
+                            SessionMemoryManager.getSession(this@AiSettingsActivity, chosen.sessionId)
+                        }
+                        if (detail != null) {
+                            showSessionDetailDialog(detail)
+                        }
+                    }
+                }
+                .setNeutralButton("清空全部") { _, _ ->
+                    showClearAllSessionsConfirmDialog()
+                }
+                .setNegativeButton("关闭", null)
+                .create()
+
+            showAndStylizeDialog(dialog)
+        }
+    }
+
+    /**
+     * 弹出指定会话记忆的详细信息展示与管理对话框
+     *
+     * 展示会话标识、标题、长期记忆事实提要及最近历史对白概览，并提供单条会话清除功能。
+     *
+     * Args:
+     *     session (SessionMemory): 当前选中的会话记忆实体对象。
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity:showSessionManagerDialog`
+     */
+    private fun showSessionDetailDialog(session: SessionMemory) {
+        val typeStr = if (session.sessionType == SessionMemoryManager.SCENE_GROUP) "群聊" else "私聊"
+        val summaryContent = if (session.summary.isBlank()) "(暂无浓缩长期记忆提要)" else session.summary
+        val historyOverview = if (session.turns.isEmpty()) {
+            "(暂无未归档历史对白)"
+        } else {
+            session.turns.takeLast(3).joinToString("\n") { turn ->
+                "• 问: ${turn.userPrompt.take(30)}...\n  答: ${turn.assistantReply.take(30)}..."
+            }
+        }
+
+        val message = "【会话标识】${session.sessionId}\n" +
+                "【会话名称】${session.sessionTitle} ($typeStr)\n\n" +
+                "【长期事实记忆提要】\n$summaryContent\n\n" +
+                "【最近对白记录 (共${session.turns.size}轮)】\n$historyOverview"
+
+        val dialog = createThemedDialogBuilder()
+            .setTitle("会话记忆详情")
+            .setMessage(message)
+            .setPositiveButton("删除该会话记忆") { _, _ ->
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        SessionMemoryManager.deleteSession(this@AiSettingsActivity, session.sessionId)
+                    }
+                    Toast.makeText(this@AiSettingsActivity, "已清除该会话的记忆数据", Toast.LENGTH_SHORT).show()
+                    showSessionManagerDialog()
+                }
+            }
+            .setNegativeButton("关闭") { _, _ ->
+                showSessionManagerDialog()
+            }
+            .create()
+
+        showAndStylizeDialog(dialog)
+    }
+
+    /**
+     * 弹出清空全部会话记忆的二次确认对话框
+     *
+     * 防范用户误触，确认后清空 SQLite 数据库中的全部会话记忆与对话历史。
+     *
+     * Args:
+     *     无
+     *
+     * Returns:
+     *     Unit
+     *
+     * Callers:
+     *     - `AiSettingsActivity:showSessionManagerDialog`
+     */
+    private fun showClearAllSessionsConfirmDialog() {
+        val dialog = createThemedDialogBuilder()
+            .setTitle("清空全部记忆")
+            .setMessage("确定要清空所有群聊与私聊的长期记忆与对话历史数据吗？\n此操作将重置全部已沉淀的记忆提要且不可恢复。")
+            .setPositiveButton("确认清空") { _, _ ->
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        SessionMemoryManager.clearAllSessions(this@AiSettingsActivity)
+                    }
+                    Toast.makeText(this@AiSettingsActivity, "已成功清空全部会话记忆", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("取消") { _, _ ->
+                showSessionManagerDialog()
+            }
             .create()
 
         showAndStylizeDialog(dialog)

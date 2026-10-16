@@ -546,7 +546,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
-                        android:max="100"
+                        android:max="1000"
                         android:paddingStart="14dp"
                         android:paddingEnd="14dp"
                         android:splitTrack="false"
@@ -826,6 +826,481 @@
                         android:switchMinWidth="47dp"
                         android:thumb="@drawable/switch_thumb_qui"
                         android:track="@drawable/switch_track_qui" />
+                </RelativeLayout>
+
+            </LinearLayout>
+
+            <!-- 分组 5：记忆与压缩 -->
+            <TextView
+                android:id="@+id/tvGroup4Title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="7dp"
+                android:text="记忆与压缩"
+                android:textColor="#8E8E93"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/cardMemory"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginBottom="24dp"
+                android:background="@drawable/bg_qq_card"
+                android:clipToOutline="true"
+                android:orientation="vertical">
+
+                <!-- 1. 会话记忆开关 -->
+                <RelativeLayout
+                    android:id="@+id/itemSessionMemory"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:layout_toStartOf="@+id/switchSessionMemory"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvSessionMemoryLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="启用会话长期记忆"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+
+                        <TextView
+                            android:id="@+id/tvSessionMemoryDesc"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="群聊与私聊独立记忆，每次回复自动累积对话"
+                            android:textColor="#8E8E93"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <Switch
+                        android:id="@+id/switchSessionMemory"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:background="@null"
+                        android:showText="false"
+                        android:switchMinWidth="47dp"
+                        android:thumb="@drawable/switch_thumb_qui"
+                        android:track="@drawable/switch_track_qui" />
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/divMemory1"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 2. 智能上下文压缩开关 -->
+                <RelativeLayout
+                    android:id="@+id/itemContextCompress"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:layout_toStartOf="@+id/switchContextCompress"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvContextCompressLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="智能上下文压缩"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+
+                        <TextView
+                            android:id="@+id/tvContextCompressDesc"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="达到阈值后自动提炼事实提要并归档早期历史"
+                            android:textColor="#8E8E93"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <Switch
+                        android:id="@+id/switchContextCompress"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:background="@null"
+                        android:showText="false"
+                        android:switchMinWidth="47dp"
+                        android:thumb="@drawable/switch_thumb_qui"
+                        android:track="@drawable/switch_track_qui" />
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/divMemory2"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 3. 压缩触发阈值 -->
+                <RelativeLayout
+                    android:id="@+id/itemCompressThreshold"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvCompressThresholdLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="压缩触发阈值"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/tvCompressThresholdValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:text="4000 字符"
+                        android:textColor="#8E8E93"
+                        android:textSize="14sp" />
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/divMemory3"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 4. 压缩保留最新轮数 -->
+                <RelativeLayout
+                    android:id="@+id/itemCompressKeepTurns"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvCompressKeepTurnsLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="压缩保留最新轮数"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <TextView
+                        android:id="@+id/tvCompressKeepTurnsValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:text="5 轮"
+                        android:textColor="#8E8E93"
+                        android:textSize="14sp" />
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/divMemory4"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 5. 会话记忆数据管理 -->
+                <RelativeLayout
+                    android:id="@+id/itemManageSessions"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvManageSessionsLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="会话记忆数据管理"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <ImageView
+                        android:id="@+id/ivManageSessionsChevron"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:alpha="0.4"
+                        android:src="@drawable/qui_chevron_left"
+                        android:rotation="180" />
+                </RelativeLayout>
+
+            </LinearLayout>
+
+            <!-- 分组 6：视觉理解 -->
+            <TextView
+                android:id="@+id/tvGroupVisionTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="7dp"
+                android:text="视觉理解"
+                android:textColor="#8E8E93"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/cardVision"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginBottom="28dp"
+                android:background="@drawable/bg_qq_card"
+                android:clipToOutline="true"
+                android:orientation="vertical">
+
+                <!-- 1. 独立图片理解开关 -->
+                <RelativeLayout
+                    android:id="@+id/itemVisionCaption"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:layout_toStartOf="@+id/switchVisionCaption"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/tvVisionCaptionLabel"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="启用独立视觉服务"
+                            android:textColor="#000000"
+                            android:textSize="16sp" />
+
+                        <TextView
+                            android:id="@+id/tvVisionCaptionDesc"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="提取画面事实，辅助非多模态主模型"
+                            android:textColor="#8E8E93"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+
+                    <Switch
+                        android:id="@+id/switchVisionCaption"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:background="@null"
+                        android:showText="false"
+                        android:switchMinWidth="47dp"
+                        android:thumb="@drawable/switch_thumb_qui"
+                        android:track="@drawable/switch_track_qui" />
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/divVision1"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 2. 视觉接口地址 -->
+                <RelativeLayout
+                    android:id="@+id/itemVisionBaseUrl"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvVisionBaseUrlLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="接口地址"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvVisionBaseUrlValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:maxWidth="160dp"
+                            android:singleLine="true"
+                            android:text="未配置"
+                            android:textColor="#8E8E93"
+                            android:textSize="14sp" />
+
+                        <ImageView
+                            android:id="@+id/ivVisionBaseUrlArrow"
+                            android:layout_width="8dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="6dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/qui_chevron_right" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/divVision2"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 3. 视觉 API 密钥 -->
+                <RelativeLayout
+                    android:id="@+id/itemVisionApiKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvVisionApiKeyLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="API 密钥"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvVisionApiKeyValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:maxWidth="160dp"
+                            android:singleLine="true"
+                            android:text="未配置"
+                            android:textColor="#8E8E93"
+                            android:textSize="14sp" />
+
+                        <ImageView
+                            android:id="@+id/ivVisionApiKeyArrow"
+                            android:layout_width="8dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="6dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/qui_chevron_right" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+                <View
+                    android:id="@+id/divVision3"
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:background="#14000000" />
+
+                <!-- 4. 视觉模型 -->
+                <RelativeLayout
+                    android:id="@+id/itemVisionModel"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_qq_item_ripple"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingHorizontal="16dp">
+
+                    <TextView
+                        android:id="@+id/tvVisionModelLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:text="模型"
+                        android:textColor="#000000"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tvVisionModelValue"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:maxWidth="160dp"
+                            android:singleLine="true"
+                            android:text="未配置"
+                            android:textColor="#8E8E93"
+                            android:textSize="14sp" />
+
+                        <ImageView
+                            android:id="@+id/ivVisionModelArrow"
+                            android:layout_width="8dp"
+                            android:layout_height="14dp"
+                            android:layout_marginStart="6dp"
+                            android:scaleType="fitCenter"
+                            android:src="@drawable/qui_chevron_right" />
+                    </LinearLayout>
                 </RelativeLayout>
 
             </LinearLayout>
